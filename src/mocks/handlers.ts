@@ -137,7 +137,7 @@ export const handlers = [
       name: `${ticketType} for Device ${deviceId}`,
       priority,
       assignee__wattman_id: 0,
-      assignee__username: "iot@system.com",
+      assignee__username: "abc@def.com",
       site__timezone: "Asia/Kolkata",
       last_updated_at: now,
       ticket_created_at: now,
