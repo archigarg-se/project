@@ -25,7 +25,7 @@ function App() {
   const [modalAlarm, setModalAlarm] = useState<Alarm | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
   const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
-
+  const [showConfig, setShowConfig] = useState(false);
   // Configurable thresholds
   const [config, setConfig] = useState<Config>({
     temperature: { operator: ">", value: 70 },
@@ -87,12 +87,16 @@ function App() {
       <header className="w-full bg-pink-500 py-1 fixed top-0 left-0 z-10">
         <h1 className="text-xs font-semibold text-white ml-4">Alerts</h1>
       </header>
-      <div className="p-4 pt-14">
-        {/* Config Form */}
+      <button
+        className="mb-2 px-3 py-1 bg-gray-300 text-xs rounded"
+        onClick={() => setShowConfig((v) => !v)}
+      >
+        {showConfig ? "Hide Rules" : "Configure Rules"}
+      </button>
+      {showConfig && (
         <div className="mb-4 p-4 bg-gray-100 rounded">
           <h2 className="font-bold mb-2 text-sm">Set Alert Rules</h2>
           <form className="flex flex-wrap gap-4 items-end">
-            {/* Temperature Rule */}
             <div>
               <label className="block text-xs">Temperature</label>
               <select
@@ -163,44 +167,44 @@ function App() {
             </div>
           </form>
         </div>
-        <button
-          className="mb-4 px-4 py-2 bg-blue-600 text-black rounded"
-          onClick={() => setShowForm(true)}
-        >
-          Simulate Telemetry
-        </button>
-        {showForm && (
-          <AlarmForm
-            onClose={() => setShowForm(false)}
-            onSuccess={handleAlarmAdded}
-            config={config}
-          />
+      )}
+
+      <button
+        className="mb-4 px-4 py-2 bg-blue-600 text-black rounded"
+        onClick={() => setShowForm(true)}
+      >
+        Simulate Telemetry
+      </button>
+      {showForm && (
+        <AlarmForm
+          onClose={() => setShowForm(false)}
+          onSuccess={handleAlarmAdded}
+          config={config}
+        />
+      )}
+      <div className="mt-6">
+        <h2 className="text-lg font-bold mb-2">Alarms</h2>
+        {loading ? (
+          <div>Loading...</div>
+        ) : (
+          <DataTable columns={columns} data={alarms} />
         )}
-        <div className="mt-6">
-          <h2 className="text-lg font-bold mb-2">Alarms</h2>
-          {loading ? (
-            <div>Loading...</div>
-          ) : (
-            <DataTable columns={columns} data={alarms} />
-          )}
-        </div>
-        {modalAlarm && (
-  <div
-    className={`fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-30 transition-opacity duration-200 ${
-      modalVisible ? "opacity-100" : "opacity-0 pointer-events-none"
-    }`}
-    // Remove onMouseLeave here!
-  >
-    <AlarmHoverCard
-      alarm={modalAlarm}
-      onClose={() => {
-        setModalVisible(false);
-        setTimeout(() => setModalAlarm(null), 400);
-      }}
-    />
-  </div>
-)}
       </div>
+      {modalAlarm && (
+        <div
+          className={`fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-30 transition-opacity duration-200 ${
+            modalVisible ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+        >
+          <AlarmHoverCard
+            alarm={modalAlarm}
+            onClose={() => {
+              setModalVisible(false);
+              setTimeout(() => setModalAlarm(null), 400);
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
