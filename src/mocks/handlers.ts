@@ -77,29 +77,64 @@ export const handlers = [
   http.get('/api/alarms', () => {
     return HttpResponse.json(mockAlarms);
   }),
-  http.post('/api/alarms', async ({ request }) => {
-    const body = (await request.json()) as { deviceId: string; metric: string; value: number; timestamp: string;site__display_name:string};
-    let shouldCreate = false;
-    let ticketType = '';
-    let priority = 'low';
-    if (body.metric === 'temperature' && body.value > 70) {
-      shouldCreate = true;
-      ticketType = 'Temperature out of range';
-      priority = 'high';
-    }
-    if (body.metric === 'humidity' && body.value > 90) {
-      shouldCreate = true;
-      ticketType = 'High Humidity';
-      priority = 'medium';
-    }
-    if (!shouldCreate) {
-      return HttpResponse.json({ message: 'No ticket triggered' }, { status: 200 });
-    }
+    http.post('/api/alarms', async ({ request }) => {
+  const body = await request.json() as {
+    deviceId: string;
+    metric: string;
+    value: number;
+    timestamp: string;
+    site__display_name: string;
+    config: {
+      temperature: { operator: string; value: number };
+      humidity: { operator: string; value: number };
+    };
+  };
+  const { deviceId, metric, value, timestamp, site__display_name, config } = body;
+
+  const existing = mockAlarms.alarms.find(
+    (a: any) =>
+      a.deviceId === deviceId && a.category === metric && a.status === "open"
+  );
+
+  let shouldCreate = false;
+  let ticketType = '';
+  let priority = 'low';
+
+  if (
+    metric === 'temperature' &&
+    eval(`${value} ${config.temperature.operator} ${config.temperature.value}`)
+   
+  ) {
+    shouldCreate = true;
+    ticketType = 'Temperature Alert';
+    priority = 'high';
+  }
+  if (
+    metric === 'humidity' &&
+    eval(`${value} ${config.humidity.operator} ${config.humidity.value}`)
+  ) {
+    shouldCreate = true;
+    ticketType = 'Humidity Alert';
+    priority = 'medium';
+  }
+
+  if (!shouldCreate && existing) {
+    existing.status = "resolved";
+    existing.last_updated_at = new Date().toISOString();
+    return HttpResponse.json({ alarm: existing });
+  }
+
+  if (shouldCreate && existing) {
+    existing.last_updated_at = new Date().toISOString();
+    return HttpResponse.json({ alarm: existing });
+  }
+
+  if (shouldCreate && !existing) {
     const ticket_number = Math.floor(Math.random() * 1000000000);
     const now = new Date().toISOString();
     const alarm = {
       ticket_number,
-      name: `${ticketType} for Device ${body.deviceId}`,
+      name: `${ticketType} for Device ${deviceId}`,
       priority,
       assignee__wattman_id: 0,
       assignee__username: "iot@system.com",
@@ -109,16 +144,21 @@ export const handlers = [
       escalation_level: 1,
       status: "open",
       site__client_name: "Client-01",
-      site__display_name: `${body.site__display_name}`,
+      site__display_name: site__display_name || `Device ${deviceId}`,
       rule_configuration__state_machine__name: null,
       acknowledged: false,
       queried_stream_paths: [],
-      category: body.metric,
+      category: metric,
+      deviceId, 
       device_path: [],
       device_display_name: [],
+      config,
       device_type_display_name: []
     };
     mockAlarms.alarms.unshift(alarm);
     return HttpResponse.json({ alarm });
-  }),
+  }
+
+  return HttpResponse.json({ message: 'No ticket triggered' }, { status: 200 });
+}),
 ];

@@ -1,8 +1,12 @@
 import React, { useState } from 'react';
-
+import { Button, buttonVariants } from './ui/button';
 type AlarmFormProps = {
   onClose: () => void;
   onSuccess: () => void;
+  config: {
+    temperature: { operator: string; value: number };
+    humidity: { operator: string; value: number };
+  };
 };
 
 const initialState = {
@@ -10,10 +14,10 @@ const initialState = {
   metric: '',
   value: '',
   timestamp: '',
-  site__display_name:'',
+  site__display_name: '',
 };
 
-const AlarmForm: React.FC<AlarmFormProps> = ({ onClose, onSuccess }) => {
+const AlarmForm: React.FC<AlarmFormProps> = ({ onClose, onSuccess, config }) => {
   const [form, setForm] = useState(initialState);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -31,8 +35,9 @@ const AlarmForm: React.FC<AlarmFormProps> = ({ onClose, onSuccess }) => {
         deviceId: form.deviceId,
         metric: form.metric,
         value: Number(form.value),
-        site__display_name: form.site__display_name,
         timestamp: form.timestamp,
+        site__display_name: form.site__display_name,
+        config, // Pass config to backend
       };
       const res = await fetch('/api/alarms', {
         method: 'POST',
@@ -72,6 +77,14 @@ const AlarmForm: React.FC<AlarmFormProps> = ({ onClose, onSuccess }) => {
             className="w-full border p-2 rounded"
             required
           />
+          <input
+            name="site__display_name"
+            placeholder="Site Display Name"
+            value={form.site__display_name}
+            onChange={handleChange}
+            className="w-full border p-2 rounded"
+            required
+          />
           <select
             name="metric"
             value={form.metric}
@@ -88,14 +101,6 @@ const AlarmForm: React.FC<AlarmFormProps> = ({ onClose, onSuccess }) => {
             placeholder="Value"
             type="number"
             value={form.value}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-            required
-          />
-          <input
-            name="site__display_name"
-            placeholder="Site"
-            value={form.site__display_name}
             onChange={handleChange}
             className="w-full border p-2 rounded"
             required
@@ -119,9 +124,9 @@ const AlarmForm: React.FC<AlarmFormProps> = ({ onClose, onSuccess }) => {
             >
               Cancel
             </button>
-            <button
+            <button 
+              className={buttonVariants({ variant: 'outline', size: 'default' })}   
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-black rounded"
               disabled={loading}
             >
               {loading ? 'Saving...' : 'Save'}
