@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState } from "react";
+import axios from "axios";
 import { DataTable } from "./components/ui/data-table";
 import type { ColumnDef } from "@tanstack/react-table";
 import AlarmForm from "@/components/AlarmForm";
 import AlarmHoverCard from "@/components/AlarmHoverCard";
+import { useMemo } from "react";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 type Alarm = {
   ticket_number: number;
   name: string;
@@ -11,6 +15,10 @@ type Alarm = {
   site__display_name: string;
   last_updated_at: string;
   assignee__username: string;
+  // Add deviceId, category, config if you want to show them in hover card
+  deviceId?: string;
+  category?: string;
+  config?: any;
 };
 
 type Config = {
@@ -26,27 +34,81 @@ function App() {
   const [modalVisible, setModalVisible] = useState(false);
   const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
   const [showConfig, setShowConfig] = useState(false);
-  // Configurable thresholds
   const [config, setConfig] = useState<Config>({
     temperature: { operator: ">", value: 70 },
     humidity: { operator: ">", value: 90 },
   });
 
-  useEffect(() => {
-    fetch("/api/alarms")
-      .then((res) => res.json())
-      .then((data) => {
-        setAlarms(data.alarms);
-        setLoading(false);
-      });
-  }, []);
+  // Auth state (in memory only)
+  const [token, setToken] = useState<string | null>(null);
+  const [loginError, setLoginError] = useState("");
+  const [user, setUser] = useState<{ username: string } | null>(null);
 
+  // Axios instance with auth header
+  const axiosInstance = useMemo(() => {
+    const instance = axios.create();
+    if (token) {
+      instance.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+    }
+    return instance;
+  }, [token]);
+
+  // Fetch alarms on mount
+  useEffect(() => {
+    if (!token) return;
+    setLoading(true);
+    axiosInstance.get("/api/alarms").then((res) => {
+      setAlarms(res.data.alarms);
+      setLoading(false);
+    });
+  }, [token, axiosInstance]);
+  // Show login form if not authenticated
+  if (!token) {
+    return (
+      <div className="flex ml-120 items-center justify-center bg-gray-50">
+  <form
+    className="bg-white p-8 rounded-xl shadow-lg w-full max-w-xs space-y-4"
+    onSubmit={async e => {
+      e.preventDefault();
+      const username = (e.currentTarget.elements.namedItem("username") as HTMLInputElement).value;
+      const password = (e.currentTarget.elements.namedItem("password") as HTMLInputElement).value;
+      try {
+        const res = await axios.post("/api/login", { username, password });
+        setToken(res.data.token);
+        setUser(res.data.user);
+        setLoginError("");
+      } catch (err: any) {
+        setLoginError("Invalid credentials");
+      }
+    }}
+  >
+    <h2 className="font-bold mb-2 text-xl text-center">Login</h2>
+    <Input
+      name="username"
+      placeholder="Username"
+      className="mb-2"
+      required
+    />
+    <Input
+      name="password"
+      type="password"
+      placeholder="Password"
+      className="mb-2"
+      required
+    />
+    {loginError && <div className="text-red-600 text-xs mb-2 text-center">{loginError}</div>}
+    <Button type="submit" variant="outline" className="w-full">
+      Login
+    </Button>
+  </form>
+</div>
+    );
+  }
   const handleAlarmAdded = async () => {
     setShowForm(false);
     setLoading(true);
-    const res = await fetch("/api/alarms");
-    const data = await res.json();
-    setAlarms(data.alarms);
+    const res = await axiosInstance.get("/api/alarms");
+    setAlarms(res.data.alarms);
     setLoading(false);
   };
 
@@ -87,8 +149,19 @@ function App() {
       <header className="w-full bg-pink-500 py-1 fixed top-0 left-0 z-10">
         <h1 className="text-xs font-semibold text-white ml-4">Alerts</h1>
       </header>
+      <Button
+        className="absolute top-2 right-2"
+        variant="outline"
+        size="sm"
+        onClick={() => {
+          setToken(null);
+          setUser(null);
+        }}
+      >
+        Logout
+      </Button>
       <button
-        className="mb-2 px-3 py-1 bg-gray-300 text-xs rounded"
+        className="mb-2 mr-2 px-3 py-1 bg-gray-300 text-xs rounded"
         onClick={() => setShowConfig((v) => !v)}
       >
         {showConfig ? "Hide Rules" : "Configure Rules"}

@@ -73,8 +73,29 @@ const mockAlarms = {
   previous: null
 };
 
+const SECRET = "";
+const DEMO_USER = { username: "", password: "" };
 export const handlers = [
-  http.get('/api/alarms', () => {
+  http.post('/api/login', async ({ request }) => {
+    const { username, password } = await request.json() as { username: string; password: string };
+    if (username === DEMO_USER.username && password === DEMO_USER.password) {
+      // Just use a fake token string
+      const token = "";
+      return HttpResponse.json({ token, user: { username } });
+    }
+    return HttpResponse.json({ message: "Invalid credentials" }, { status: 401 });
+  }),
+
+  http.get('/api/alarms', async ({ request }) => {
+    const auth = request.headers.get("authorization");
+    if (!auth || !auth.startsWith("Bearer ")) {
+      return HttpResponse.json({ message: "Unauthorized" }, { status: 401 });
+    }
+    // Optionally check if token matches the fake token
+    const token = auth.replace("Bearer ", "");
+    if (token !== "") {
+      return HttpResponse.json({ message: "Invalid token" }, { status: 401 });
+    }
     return HttpResponse.json(mockAlarms);
   }),
     http.post('/api/alarms', async ({ request }) => {
@@ -89,7 +110,7 @@ export const handlers = [
       humidity: { operator: string; value: number };
     };
   };
-  const { deviceId, metric, value, timestamp, site__display_name, config } = body;
+  const { deviceId, metric, value, site__display_name, config } = body;
 
   const existing = mockAlarms.alarms.find(
     (a: any) =>
