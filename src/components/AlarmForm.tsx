@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Button, buttonVariants } from './ui/button';
+import { buttonVariants } from './ui/button';
+import axios from "axios";
+
 type AlarmFormProps = {
   onClose: () => void;
   onSuccess: () => void;
@@ -26,43 +28,52 @@ const AlarmForm: React.FC<AlarmFormProps> = ({ onClose, onSuccess, config }) => 
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    try {
-      const payload = {
+  
+const handleSubmit = async (e: React.FormEvent) => {
+  e.preventDefault();
+  setLoading(true);
+  setError('');
+  try {
+    const payload = {
+      deviceId: form.deviceId,
+      metric: form.metric,
+      value: Number(form.value),
+      timestamp: form.timestamp,
+      site__display_name: form.site__display_name,
+      config, // Pass config to backend
+    };
+    const res = await fetch('/api/alarms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const text = await res.text();
+    if (!text) {
+      setError('No response from server');
+      setLoading(false);
+      return;
+    }
+    const data = JSON.parse(text);
+
+    if (data.alarm) {
+      // Only post telemetry if alarm was created
+      await axios.post("/api/telemetry", {
         deviceId: form.deviceId,
         metric: form.metric,
         value: Number(form.value),
         timestamp: form.timestamp,
-        site__display_name: form.site__display_name,
-        config, // Pass config to backend
-      };
-      const res = await fetch('/api/alarms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
       });
-
-      const text = await res.text();
-      if (!text) {
-        setError('No response from server');
-        return;
-      }
-      const data = JSON.parse(text);
-
-      if (data.alarm) {
-        onSuccess();
-      } else {
-        setError(data.message || 'No ticket triggered');
-      }
-    } catch (err: any) {
-      setError(err.message || 'Error');
-    } finally {
-      setLoading(false);
+      onSuccess();
+    } else {
+      setError(data.message || 'No ticket triggered');
     }
-  };
+  } catch (err: any) {
+    setError(err.message || 'Error');
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
