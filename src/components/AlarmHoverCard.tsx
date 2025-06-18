@@ -22,6 +22,33 @@ function AlarmHoverCard({
   const [history, setHistory] = useState<
     { value: number; timestamp: string }[]
   >([]);
+  const [status, setStatus] = useState(alarm.status);
+
+  const handleAction = async (
+    action: "snooze" | "unsnooze" | "acknowledge"
+  ) => {
+    let endpoint = "";
+    let comment = "";
+    if (action === "snooze") {
+      endpoint = "/api/snooze";
+      comment = `Snoozed at ${new Date().toISOString()}`;
+    } else if (action === "unsnooze") {
+      endpoint = "/api/unsnooze";
+      comment = `Unsnoozed at ${new Date().toISOString()}`;
+    } else if (action === "acknowledge") {
+      endpoint = "/api/acknowledge";
+      comment = `Acknowledged at ${new Date().toISOString()}`;
+    }
+    const apiBase = BACKEND_MODE === "server" ? "http://localhost:4000" : "";
+    const res = await axios.post(`${apiBase}${endpoint}`, {
+      ticket_number: alarm.ticket_number,
+      comment,
+    });
+    if (res.data.alarm) {
+      setStatus(res.data.alarm.status);
+    }
+    onClose();
+  };
 
   // Fetch device history when modal opens
   useEffect(() => {
@@ -86,19 +113,27 @@ function AlarmHoverCard({
         </TabsContent>
         <TabsContent value="config">
           <div className="text-sm text-gray-700 space-y-2">
-        
-            <button
-              className="absolute bottom-2 right-20 bg-yellow-400 text-black px-3 py-1 rounded hover:bg-yellow-500"
-              onClick={async () => {
-                await axios.post("/api/snooze", {
-                  ticket_number: alarm.ticket_number,
-                  comment: `Snoozed at ${new Date().toISOString()}`,
-                });
-                onClose();
-              }}
-            >
-              Snooze
-            </button>
+            <div className="flex gap-2 mb-2">
+              <button
+                className="bg-yellow-400 text-black px-3 py-1 rounded hover:bg-yellow-500"
+                onClick={() => handleAction("snooze")}
+              >
+                Snooze
+              </button>
+              <button
+                className="bg-green-400 text-black px-3 py-1 rounded hover:bg-green-500"
+                onClick={() => handleAction("unsnooze")}
+              >
+                Unsnooze
+              </button>
+              <button
+                className="bg-blue-400 text-black px-3 py-1 rounded hover:bg-blue-500"
+                onClick={() => handleAction("acknowledge")}
+              >
+                Acknowledge
+              </button>
+            </div>
+
             <div>
               <b>Device ID:</b> {alarm.deviceId || "N/A"}
             </div>
@@ -112,6 +147,10 @@ function AlarmHoverCard({
                 : alarm.category === "humidity" && alarm.config?.humidity
                 ? `Humidity ${alarm.config.humidity.operator} ${alarm.config.humidity.value}`
                 : "N/A"}
+            </div>
+
+            <div>
+              <b>Status:</b> {status}
             </div>
           </div>
         </TabsContent>

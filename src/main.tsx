@@ -6,12 +6,12 @@ import './index.css';
 
 // IMPORTANT: Only import and start MSW in development mode
 if (import.meta.env.DEV) {
-  console.log('--- MSW: Attempting to start service worker ---');
+  console.log('MSW: Attempting to start service worker');
   import('./mocks/browser') // Path to your browser.ts
     .then(({ worker }) => {
       worker.start({ onUnhandledRequest: 'bypass' }) // 'bypass' is usually good for dev
         .then(() => {
-          console.log('--- MSW: Service worker started successfully! ---');
+          console.log('MSW: Service worker started successfully!');
           ReactDOM.createRoot(document.getElementById('root')!).render(
             <React.StrictMode>
               <App />

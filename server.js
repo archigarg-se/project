@@ -51,6 +51,7 @@ app.get('/api/alarms', (req, res) => {
 
 app.post('/api/alarms', async (req, res) => {
   const now = new Date().toISOString();
+  const { deviceId, metric, value, timestamp } = req.body;
   // Find existing alarm for device/metric
   const alarmIdx = alarms.findIndex(
     (a) =>
@@ -87,6 +88,11 @@ app.post('/api/alarms', async (req, res) => {
     comments: [],
   };
   alarms.unshift(alarm);
+  // Send email
+  await sendMail(
+    `New Alarm Created: ${metric}`,
+    `Device: ${deviceId}\nMetric: ${metric}\nValue: ${value}\nTimestamp: ${timestamp}`
+  );
   res.json({ alarm });
 });
 
@@ -98,8 +104,7 @@ app.post('/api/rules', (req, res) => {
   rules = req.body;
   res.json(rules);
 });
-
-// SNOOZE ENDPOINT
+// SNOOZE
 app.post("/api/snooze", async (req, res) => {
   const { ticket_number, comment } = req.body;
   const alarm = alarms.find(a => a.ticket_number === ticket_number);
@@ -108,10 +113,37 @@ app.post("/api/snooze", async (req, res) => {
     alarm.comments = alarm.comments || [];
     alarm.comments.push(comment);
     alarm.last_updated_at = new Date().toISOString();
-    res.json({ ok: true, alarm });
-  } else {
-    res.status(404).json({ ok: false, error: "Alarm not found" });
+    return res.json({ ok: true, alarm });
   }
+  res.status(404).json({ ok: false, error: "Alarm not found" });
+});
+
+// UNSNOOZE
+app.post("/api/unsnooze", async (req, res) => {
+  const { ticket_number, comment } = req.body;
+  const alarm = alarms.find(a => a.ticket_number === ticket_number);
+  if (alarm) {
+    alarm.status = "open";
+    alarm.comments = alarm.comments || [];
+    alarm.comments.push(comment);
+    alarm.last_updated_at = new Date().toISOString();
+    return res.json({ ok: true, alarm });
+  }
+  res.status(404).json({ ok: false, error: "Alarm not found" });
+});
+
+// ACKNOWLEDGE
+app.post("/api/acknowledge", async (req, res) => {
+  const { ticket_number, comment } = req.body;
+  const alarm = alarms.find(a => a.ticket_number === ticket_number);
+  if (alarm) {
+    alarm.status = "acknowledged";
+    alarm.comments = alarm.comments || [];
+    alarm.comments.push(comment);
+    alarm.last_updated_at = new Date().toISOString();
+    return res.json({ ok: true, alarm });
+  }
+  res.status(404).json({ ok: false, error: "Alarm not found" });
 });
 
 let telemetryHistory = []; // { deviceId, metric, value, timestamp }
@@ -125,11 +157,7 @@ app.post('/api/telemetry', async (req, res) => {
   telemetryHistory = telemetryHistory.filter(
     (d) => new Date(d.timestamp).getTime() >= cutoff
   );
-  // Send email
-  await sendMail(
-    `Telemetry Data Received: ${metric}`,
-    `Device: ${deviceId}\nMetric: ${metric}\nValue: ${value}\nTimestamp: ${timestamp}`
-  );
+  
   res.json({ ok: true });
 });
 

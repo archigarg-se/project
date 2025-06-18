@@ -81,7 +81,7 @@ setInterval(async () => {
     value,
     timestamp,
   });
-}, 60 * 2000);
+}, 60 * 1000);
 
   setInterval(() => {
     const msg = JSON.stringify({
