@@ -36,7 +36,6 @@ async function sendMail(subject, text) {
     text,
   });
 }
-
 app.post('/api/login', (req, res) => {
   const { username, password } = req.body;
   if (username === "admin" && password === "password") {
@@ -51,7 +50,6 @@ app.get('/api/alarms', (req, res) => {
 
 app.post('/api/alarms', async (req, res) => {
   const now = new Date().toISOString();
-  const { deviceId, metric, value, timestamp } = req.body;
   // Find existing alarm for device/metric
   const alarmIdx = alarms.findIndex(
     (a) =>
@@ -88,11 +86,14 @@ app.post('/api/alarms', async (req, res) => {
     comments: [],
   };
   alarms.unshift(alarm);
-  // Send email
+
+  // Send email for alarm creation
   await sendMail(
-    `New Alarm Created: ${metric}`,
-    `Device: ${deviceId}\nMetric: ${metric}\nValue: ${value}\nTimestamp: ${timestamp}`
+    'New Alarm Ticket Created',
+    `Alarm ticket created:\n Device: ${req.body.deviceId}\nMetric: ${req.body.metric}\nValue: ${req.body.value}\nTimestamp: ${req.body.timestamp}`
   );
+
+  
   res.json({ alarm });
 });
 
@@ -104,7 +105,17 @@ app.post('/api/rules', (req, res) => {
   rules = req.body;
   res.json(rules);
 });
-// SNOOZE
+
+app.post('/api/invalid-ticket', async (req, res) => {
+  const { deviceId, metric, value, timestamp, reason } = req.body;
+  await sendMail(
+    'Invalid Telemetry Detected',
+    `Invalid telemetry received:\nDevice: ${deviceId}\nMetric: ${metric}\nValue: ${value}\nTimestamp: ${timestamp}\nReason: ${reason || 'Unknown'}`
+  );
+  res.json({ ok: true });
+});
+
+// SNOOZE ENDPOINT
 app.post("/api/snooze", async (req, res) => {
   const { ticket_number, comment } = req.body;
   const alarm = alarms.find(a => a.ticket_number === ticket_number);
@@ -113,26 +124,36 @@ app.post("/api/snooze", async (req, res) => {
     alarm.comments = alarm.comments || [];
     alarm.comments.push(comment);
     alarm.last_updated_at = new Date().toISOString();
-    return res.json({ ok: true, alarm });
+    await sendMail(
+      'Alarm Snoozed',
+      `Alarm ${ticket_number} was snoozed.\nComment: ${comment || ''}`
+    );
+    res.json({ ok: true, alarm });
+  } else {
+    res.status(404).json({ ok: false, error: "Alarm not found" });
   }
-  res.status(404).json({ ok: false, error: "Alarm not found" });
 });
 
-// UNSNOOZE
+// UNSNOOZE ENDPOINT
 app.post("/api/unsnooze", async (req, res) => {
   const { ticket_number, comment } = req.body;
   const alarm = alarms.find(a => a.ticket_number === ticket_number);
   if (alarm) {
-    alarm.status = "open";
+    alarm.status = "un-snoozed";
     alarm.comments = alarm.comments || [];
     alarm.comments.push(comment);
     alarm.last_updated_at = new Date().toISOString();
-    return res.json({ ok: true, alarm });
+    await sendMail(
+      'Alarm Unsnoozed',
+      `Alarm ${ticket_number} was unsnoozed.\nComment: ${comment || ''}`
+    );
+    res.json({ ok: true, alarm });
+  } else {
+    res.status(404).json({ ok: false, error: "Alarm not found" });
   }
-  res.status(404).json({ ok: false, error: "Alarm not found" });
 });
 
-// ACKNOWLEDGE
+// ACKNOWLEDGE ENDPOINT
 app.post("/api/acknowledge", async (req, res) => {
   const { ticket_number, comment } = req.body;
   const alarm = alarms.find(a => a.ticket_number === ticket_number);
@@ -141,12 +162,17 @@ app.post("/api/acknowledge", async (req, res) => {
     alarm.comments = alarm.comments || [];
     alarm.comments.push(comment);
     alarm.last_updated_at = new Date().toISOString();
-    return res.json({ ok: true, alarm });
+    await sendMail(
+      'Alarm Acknowledged',
+      `Alarm ${ticket_number} was acknowledged.\nComment: ${comment || ''}`
+    );
+    res.json({ ok: true, alarm });
+  } else {
+    res.status(404).json({ ok: false, error: "Alarm not found" });
   }
-  res.status(404).json({ ok: false, error: "Alarm not found" });
 });
 
-let telemetryHistory = []; // { deviceId, metric, value, timestamp }
+let telemetryHistory= []; // { deviceId, metric, value, timestamp }
 
 // TELEMETRY ENDPOINT (send email here)
 app.post('/api/telemetry', async (req, res) => {
@@ -157,7 +183,6 @@ app.post('/api/telemetry', async (req, res) => {
   telemetryHistory = telemetryHistory.filter(
     (d) => new Date(d.timestamp).getTime() >= cutoff
   );
-  
   res.json({ ok: true });
 });
 
@@ -171,7 +196,7 @@ app.get('/api/history', (req, res) => {
         d.metric === metric &&
         new Date(d.timestamp).getTime() >= cutoff
     )
-    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   res.json(Array.isArray(history) ? history : []);
 });
 

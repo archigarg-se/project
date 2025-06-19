@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { DataTable } from "./components/ui/data-table";
 import type { ColumnDef } from "@tanstack/react-table";
-import AlarmForm from "@/components/AlarmForm";
-import AlarmHoverCard from "@/components/AlarmHoverCard";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import AlarmForm from "./components/AlarmForm";
+import AlarmHoverCard from "./components/AlarmHoverCard";
+import { Button } from "./components/ui/button";
+import { Input } from "./components/ui/input";
 
 type Alarm = {
   ticket_number: number;
@@ -28,8 +28,6 @@ type Config = {
 const BACKEND_MODE = import.meta.env.VITE_BACKEND_MODE;
 const apiBase = BACKEND_MODE === "server" ? "http://localhost:4000" : "";
 const axiosInstance = axios.create({ baseURL: apiBase });
-
-
 
 function App() {
   const [alarms, setAlarms] = useState<Alarm[]>([]);
