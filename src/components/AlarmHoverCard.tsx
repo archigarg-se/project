@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "./ui/tabs";
 import {
   LineChart,
@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import axios from "axios";
+import { useAlarmHoverCardStore } from "../stores/alarmHoverCard";
 const BACKEND_MODE = import.meta.env.VITE_BACKEND_MODE;
 
 function AlarmHoverCard({
@@ -19,10 +20,19 @@ function AlarmHoverCard({
   onClose: () => void;
 }) {
   const modalRef = useRef<HTMLDivElement>(null);
-  const [history, setHistory] = useState<
-    { value: number; timestamp: string }[]
-  >([]);
-  const [status, setStatus] = useState(alarm.status);
+  const {
+    history,
+    status,
+    setHistory,
+    setStatus,
+    reset,
+  } = useAlarmHoverCardStore();
+
+  // Set initial status from alarm
+  useEffect(() => {
+    setStatus(alarm.status);
+    return () => reset();
+  }, [alarm.status, setStatus, reset]);
 
   const handleAction = async (
     action: "snooze" | "unsnooze" | "acknowledge"
@@ -61,7 +71,7 @@ function AlarmHoverCard({
         )}&metric=${encodeURIComponent(alarm.category)}`
       )
       .then((res) => setHistory(res.data));
-  }, [alarm.deviceId, alarm.category]);
+  }, [alarm.deviceId, alarm.category, setHistory]);
 
   // Close on outside click
   useEffect(() => {
@@ -95,7 +105,7 @@ function AlarmHoverCard({
               <b>Name:</b> {alarm.name}
             </div>
             <div>
-              <b>Status:</b> {alarm.status}
+              <b>Status:</b> {status}
             </div>
             <div>
               <b>Priority:</b> {alarm.priority}

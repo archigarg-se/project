@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import axios from "axios";
 import { DataTable } from "./components/ui/data-table";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -6,80 +6,58 @@ import AlarmForm from "./components/AlarmForm";
 import AlarmHoverCard from "./components/AlarmHoverCard";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
-
-type Alarm = {
-  ticket_number: number;
-  name: string;
-  priority: string;
-  status: string;
-  site__display_name: string;
-  last_updated_at: string;
-  assignee__username: string;
-  deviceId?: string;
-  category?: string;
-  config?: any;
-};
-
-type Config = {
-  temperature: { operator: string; value: number };
-  humidity: { operator: string; value: number };
-};
+import { useAlarmsStore } from "./stores/alarms";
+import { useConfigStore } from "./stores/config";
+import { useUIStore } from "./stores/ui";
+import { useAuthStore } from "./stores/auth";
 
 const BACKEND_MODE = import.meta.env.VITE_BACKEND_MODE;
 const apiBase = BACKEND_MODE === "server" ? "http://localhost:4000" : "";
 const axiosInstance = axios.create({ baseURL: apiBase });
 
 function App() {
-  const [alarms, setAlarms] = useState<Alarm[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [modalAlarm, setModalAlarm] = useState<Alarm | null>(null);
-  const [modalVisible, setModalVisible] = useState(false);
+  // Zustand stores
+  const { alarms, setAlarms, loading, setLoading } = useAlarmsStore();
+  const { config, showConfig, setConfig, setShowConfig } = useConfigStore();
+  const { showForm, setShowForm, modalAlarm, setModalAlarm, modalVisible, setModalVisible } = useUIStore();
+  const { token, loginError, setToken, setUser, setLoginError } = useAuthStore();
+
   const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
-  const [showConfig, setShowConfig] = useState(false);
-  const [config, setConfig] = useState<Config>({
-    temperature: { operator: ">", value: 70 },
-    humidity: { operator: ">", value: 90 },
-  });
 
-useEffect(() => {
-  if (import.meta.env.VITE_BACKEND_MODE === "msw") {
-    const interval1 = setInterval(() => {
-      fetch("/api/telemetry", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          deviceId: "device-1",
-          metric: "temperature",
-          value: 60 + Math.round(Math.random() * 20),
-          timestamp: new Date().toISOString(),
-        }),
-      });
-    }, 5000);
+  useEffect(() => {
+    if (import.meta.env.VITE_BACKEND_MODE === "msw") {
+      const interval1 = setInterval(() => {
+        fetch("/api/telemetry", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            deviceId: "device-1",
+            metric: "temperature",
+            value: 60 + Math.round(Math.random() * 20),
+            timestamp: new Date().toISOString(),
+          }),
+        });
+      }, 5000);
 
-    const interval2 = setInterval(() => {
-      fetch("/api/telemetry", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          deviceId: "device-2",
-          metric: "humidity",
-          value: 50 + Math.round(Math.random() * 40),
-          timestamp: new Date().toISOString(),
-        }),
-      });
-    }, 5000);
+      const interval2 = setInterval(() => {
+        fetch("/api/telemetry", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            deviceId: "device-2",
+            metric: "humidity",
+            value: 50 + Math.round(Math.random() * 40),
+            timestamp: new Date().toISOString(),
+          }),
+        });
+      }, 5000);
 
-    return () => {
-      clearInterval(interval1);
-      clearInterval(interval2);
-    };
-  }
-}, []);
-  // Auth state (in memory only)
-  const [token, setToken] = useState<string | null>(null);
-  const [loginError, setLoginError] = useState("");
-  const [user, setUser] = useState<{ username: string } | null>(null);
+      return () => {
+        clearInterval(interval1);
+        clearInterval(interval2);
+      };
+    }
+  }, []);
 
   // Fetch rules from backend/MSW on mount or when config modal closes
   useEffect(() => {
@@ -87,7 +65,7 @@ useEffect(() => {
     axiosInstance.get("/api/rules").then((res) => {
       setConfig(res.data);
     });
-  }, [token, showConfig]);
+  }, [token, showConfig, setConfig]);
 
   // Fetch alarms on mount
   useEffect(() => {
@@ -99,7 +77,7 @@ useEffect(() => {
       setAlarms(res.data.alarms);
       setLoading(false);
     });
-  }, [token]);
+  }, [token, setAlarms, setLoading]);
 
   // Show login form if not authenticated
   if (!token) {
@@ -171,7 +149,7 @@ useEffect(() => {
     setLoading(false);
   };
 
-  const columns: ColumnDef<Alarm>[] = [
+  const columns: ColumnDef<any>[] = [
     {
       accessorKey: "ticket_number",
       header: "Ticket ID",
@@ -247,13 +225,13 @@ useEffect(() => {
                   <select
                     value={config.temperature.operator}
                     onChange={(e) =>
-                      setConfig((cfg) => ({
-                        ...cfg,
+                      setConfig({
+                        ...config,
                         temperature: {
-                          ...cfg.temperature,
+                          ...config.temperature,
                           operator: e.target.value,
                         },
-                      }))
+                      })
                     }
                     className="border rounded px-2 py-1 text-xs"
                   >
@@ -266,13 +244,13 @@ useEffect(() => {
                     type="number"
                     value={config.temperature.value}
                     onChange={(e) =>
-                      setConfig((cfg) => ({
-                        ...cfg,
+                      setConfig({
+                        ...config,
                         temperature: {
-                          ...cfg.temperature,
+                          ...config.temperature,
                           value: Number(e.target.value),
                         },
-                      }))
+                      })
                     }
                     className="border rounded px-2 py-1 w-20 text-xs"
                   />
@@ -284,10 +262,10 @@ useEffect(() => {
                   <select
                     value={config.humidity.operator}
                     onChange={(e) =>
-                      setConfig((cfg) => ({
-                        ...cfg,
-                        humidity: { ...cfg.humidity, operator: e.target.value },
-                      }))
+                      setConfig({
+                        ...config,
+                        humidity: { ...config.humidity, operator: e.target.value },
+                      })
                     }
                     className="border rounded px-2 py-1 text-xs"
                   >
@@ -300,13 +278,13 @@ useEffect(() => {
                     type="number"
                     value={config.humidity.value}
                     onChange={(e) =>
-                      setConfig((cfg) => ({
-                        ...cfg,
+                      setConfig({
+                        ...config,
                         humidity: {
-                          ...cfg.humidity,
+                          ...config.humidity,
                           value: Number(e.target.value),
                         },
-                      }))
+                      })
                     }
                     className="border rounded px-2 py-1 w-20 text-xs"
                   />

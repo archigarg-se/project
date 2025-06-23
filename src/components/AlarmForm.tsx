@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { buttonVariants } from './ui/button';
 import axios from "axios";
+import { useAlarmFormStore } from "../stores/alarmForm";
 
 type AlarmFormProps = {
   onClose: () => void;
@@ -11,69 +12,70 @@ type AlarmFormProps = {
   };
 };
 
-const initialState = {
-  deviceId: '',
-  metric: '',
-  value: '',
-  timestamp: '',
-  site__display_name: '',
-};
-
 const AlarmForm: React.FC<AlarmFormProps> = ({ onClose, onSuccess, config }) => {
-  const [form, setForm] = useState(initialState);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const {
+    form,
+    loading,
+    error,
+    setForm,
+    resetForm,
+    setLoading,
+    setError,
+  } = useAlarmFormStore();
+
+  React.useEffect(() => {
+    resetForm();
+  }, [resetForm]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    setForm({ [e.target.name]: e.target.value });
   };
 
-  
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-  setLoading(true);
-  setError('');
-  try {
-    const payload = {
-      deviceId: form.deviceId,
-      metric: form.metric,
-      value: Number(form.value),
-      timestamp: form.timestamp,
-      site__display_name: form.site__display_name,
-      config, // Pass config to backend
-    };
-    const res = await fetch('/api/alarms', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    const text = await res.text();
-    if (!text) {
-      setError('No response from server');
-      setLoading(false);
-      return;
-    }
-    const data = JSON.parse(text);
-
-    if (data.alarm) {
-      // Only post telemetry if alarm was created
-      await axios.post("/api/telemetry", {
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      const payload = {
         deviceId: form.deviceId,
         metric: form.metric,
         value: Number(form.value),
         timestamp: form.timestamp,
+        site__display_name: form.site__display_name,
+        config,
+      };
+      const res = await fetch('/api/alarms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
       });
-      onSuccess();
-    } else {
-      setError(data.message || 'No ticket triggered');
+
+      const text = await res.text();
+      if (!text) {
+        setError('No response from server');
+        setLoading(false);
+        return;
+      }
+      const data = JSON.parse(text);
+
+      if (data.alarm) {
+        await axios.post("/api/telemetry", {
+          deviceId: form.deviceId,
+          metric: form.metric,
+          value: Number(form.value),
+          timestamp: form.timestamp,
+        });
+        onSuccess();
+        resetForm();
+      } else {
+        setError(data.message || 'No ticket triggered');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error');
+    } finally {
+      setLoading(false);
     }
-  } catch (err: any) {
-    setError(err.message || 'Error');
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50">
@@ -129,7 +131,7 @@ const handleSubmit = async (e: React.FormEvent) => {
           <div className="flex justify-end space-x-2">
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => { onClose(); resetForm(); }}
               className="px-4 py-2 bg-gray-300 rounded"
               disabled={loading}
             >
