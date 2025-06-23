@@ -152,10 +152,8 @@ function AlarmHoverCard({
             </div>
             <div>
               <b>Rule:</b>{" "}
-              {alarm.category === "temperature" && alarm.config?.temperature
-                ? `Temperature ${alarm.config.temperature.operator} ${alarm.config.temperature.value}`
-                : alarm.category === "humidity" && alarm.config?.humidity
-                ? `Humidity ${alarm.config.humidity.operator} ${alarm.config.humidity.value}`
+              {alarm.config?.[alarm.category]
+                ? `${alarm.category} ${alarm.config[alarm.category].operator} ${alarm.config[alarm.category].value}`
                 : "N/A"}
             </div>
 

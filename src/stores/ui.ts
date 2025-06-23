@@ -1,20 +1,23 @@
 import { create } from "zustand";
-import type { Alarm } from "./alarms";
 
 type UIState = {
   showForm: boolean;
-  setShowForm: (show: boolean) => void;
-  modalAlarm: Alarm | null;
-  setModalAlarm: (alarm: Alarm | null) => void;
+  setShowForm: (b: boolean) => void;
+  modalAlarm: any;
+  setModalAlarm: (a: any) => void;
   modalVisible: boolean;
-  setModalVisible: (visible: boolean) => void;
+  setModalVisible: (b: boolean) => void;
+  selectedDevice: string;
+  setSelectedDevice: (d: string) => void;
 };
 
 export const useUIStore = create<UIState>((set) => ({
   showForm: false,
-  setShowForm: (show) => set({ showForm: show }),
+  setShowForm: (b) => set({ showForm: b }),
   modalAlarm: null,
-  setModalAlarm: (alarm) => set({ modalAlarm: alarm }),
+  setModalAlarm: (a) => set({ modalAlarm: a }),
   modalVisible: false,
-  setModalVisible: (visible) => set({ modalVisible: visible }),
+  setModalVisible: (b) => set({ modalVisible: b }),
+  selectedDevice: "device-1",
+  setSelectedDevice: (d) => set({ selectedDevice: d }),
 }));

@@ -1,23 +1,22 @@
 import { create } from "zustand";
 
+type Rule = { operator: string; value: number };
 type Config = {
-  temperature: { operator: string; value: number };
-  humidity: { operator: string; value: number };
+  [deviceId: string]: {
+    [metric: string]: Rule;
+  };
 };
 
 type ConfigState = {
   config: Config;
   showConfig: boolean;
-  setConfig: (config: Config) => void;
-  setShowConfig: (show: boolean) => void;
+  setConfig: (c: Config) => void;
+  setShowConfig: (b: boolean) => void;
 };
 
 export const useConfigStore = create<ConfigState>((set) => ({
-  config: {
-    temperature: { operator: ">", value: 70 },
-    humidity: { operator: ">", value: 90 },
-  },
+  config: {},
   showConfig: false,
-  setConfig: (config) => set({ config }),
-  setShowConfig: (show) => set({ showConfig: show }),
+  setConfig: (c) => set({ config: c }),
+  setShowConfig: (b) => set({ showConfig: b }),
 }));

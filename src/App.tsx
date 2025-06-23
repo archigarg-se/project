@@ -10,6 +10,7 @@ import { useAlarmsStore } from "./stores/alarms";
 import { useConfigStore } from "./stores/config";
 import { useUIStore } from "./stores/ui";
 import { useAuthStore } from "./stores/auth";
+import { DEVICE_CONFIG } from "./lib/utils";
 
 const BACKEND_MODE = import.meta.env.VITE_BACKEND_MODE;
 const apiBase = BACKEND_MODE === "server" ? "http://localhost:4000" : "";
@@ -18,44 +19,53 @@ const axiosInstance = axios.create({ baseURL: apiBase });
 function App() {
   // Zustand stores
   const { alarms, setAlarms, loading, setLoading } = useAlarmsStore();
-  const { config, showConfig, setConfig, setShowConfig } = useConfigStore();
-  const { showForm, setShowForm, modalAlarm, setModalAlarm, modalVisible, setModalVisible } = useUIStore();
+  const {
+  config,
+  showConfig,
+  setConfig,
+  setShowConfig,
+} = useConfigStore() as {
+  config: { [deviceId: string]: { [metric: string]: { operator: string; value: number } } };
+  showConfig: boolean;
+  setConfig: (c: any) => void;
+  setShowConfig: (b: boolean) => void;
+};
+  const {
+    showForm,
+    setShowForm,
+    modalAlarm,
+    setModalAlarm,
+    modalVisible,
+    setModalVisible,
+    selectedDevice,
+    setSelectedDevice,
+  } = useUIStore();
   const { token, loginError, setToken, setUser, setLoginError } = useAuthStore();
 
   const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (import.meta.env.VITE_BACKEND_MODE === "msw") {
-      const interval1 = setInterval(() => {
-        fetch("/api/telemetry", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            deviceId: "device-1",
-            metric: "temperature",
-            value: 60 + Math.round(Math.random() * 20),
-            timestamp: new Date().toISOString(),
-          }),
+      // Simulate telemetry for MSW/dev mode
+      const intervals: NodeJS.Timeout[] = [];
+      Object.keys(DEVICE_CONFIG).forEach((deviceId) => {
+        DEVICE_CONFIG[deviceId].metrics.forEach((metric: string) => {
+          const interval = setInterval(() => {
+            fetch("/api/telemetry", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                deviceId,
+                metric,
+                value: 50 + Math.round(Math.random() * 50),
+                timestamp: new Date().toISOString(),
+              }),
+            });
+          }, 10000);
+          intervals.push(interval);
         });
-      }, 5000);
-
-      const interval2 = setInterval(() => {
-        fetch("/api/telemetry", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            deviceId: "device-2",
-            metric: "humidity",
-            value: 50 + Math.round(Math.random() * 40),
-            timestamp: new Date().toISOString(),
-          }),
-        });
-      }, 5000);
-
-      return () => {
-        clearInterval(interval1);
-        clearInterval(interval2);
-      };
+      });
+      return () => intervals.forEach(clearInterval);
     }
   }, []);
 
@@ -149,6 +159,8 @@ function App() {
     setLoading(false);
   };
 
+  const deviceMetrics = DEVICE_CONFIG[selectedDevice]?.metrics || [];
+
   const columns: ColumnDef<any>[] = [
     {
       accessorKey: "ticket_number",
@@ -175,7 +187,39 @@ function App() {
     },
     { accessorKey: "name", header: "Name" },
     { accessorKey: "priority", header: "Priority" },
-    { accessorKey: "status", header: "Status" },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const status = row.original.status;
+        if (status === "open") {
+          return (
+            <span className="text-red-600 font-semibold">active</span>
+          );
+        }
+        if (status === "snoozed") {
+          return (
+            <span className="text-black-600 font-semibold">snoozed</span>
+          );
+        }
+        if (status === "unsnoozed") {
+          return (
+            <span className="text-black-600 font-semibold">unsnoozed</span>
+          );
+        }
+        if (status === "acknowledged") {
+          return (
+            <span className="text-black-600 font-semibold">acknowledged</span>
+          );
+        }
+        if (status === "resolved") {
+          return (
+            <span className="text-green-600 font-semibold">resolved</span>
+          );
+        }
+        return <span>{status}</span>;
+      },
+    },
     { accessorKey: "site__display_name", header: "Site" },
     { accessorKey: "last_updated_at", header: "Last Updated" },
     { accessorKey: "assignee__username", header: "Assignee" },
@@ -220,76 +264,64 @@ function App() {
             </h2>
             <form className="flex flex-col gap-4" onSubmit={e => { e.preventDefault(); handleConfigSave(); }}>
               <div>
-                <label className="block text-xs mb-1">Temperature</label>
-                <div className="flex gap-2">
-                  <select
-                    value={config.temperature.operator}
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        temperature: {
-                          ...config.temperature,
-                          operator: e.target.value,
-                        },
-                      })
-                    }
-                    className="border rounded px-2 py-1 text-xs"
-                  >
-                    <option value=">">&gt;</option>
-                    <option value="<">&lt;</option>
-                    <option value=">=">&ge;</option>
-                    <option value="<=">&le;</option>
-                  </select>
-                  <input
-                    type="number"
-                    value={config.temperature.value}
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        temperature: {
-                          ...config.temperature,
-                          value: Number(e.target.value),
-                        },
-                      })
-                    }
-                    className="border rounded px-2 py-1 w-20 text-xs"
-                  />
-                </div>
+                <label className="block text-xs mb-1">Device</label>
+                <select
+                  value={selectedDevice}
+                  onChange={e => setSelectedDevice(e.target.value)}
+                  className="border rounded px-2 py-1 text-xs"
+                >
+                  {Object.keys(DEVICE_CONFIG).map((deviceId) => (
+                    <option key={deviceId} value={deviceId}>
+                      {deviceId} ({DEVICE_CONFIG[deviceId].site})
+                    </option>
+                  ))}
+                </select>
               </div>
-              <div>
-                <label className="block text-xs mb-1">Humidity</label>
-                <div className="flex gap-2">
-                  <select
-                    value={config.humidity.operator}
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        humidity: { ...config.humidity, operator: e.target.value },
-                      })
-                    }
-                    className="border rounded px-2 py-1 text-xs"
-                  >
-                    <option value=">">&gt;</option>
-                    <option value="<">&lt;</option>
-                    <option value=">=">&ge;</option>
-                    <option value="<=">&le;</option>
-                  </select>
-                  <input
-                    type="number"
-                    value={config.humidity.value}
-                    onChange={(e) =>
-                      setConfig({
-                        ...config,
-                        humidity: {
-                          ...config.humidity,
-                          value: Number(e.target.value),
-                        },
-                      })
-                    }
-                    className="border rounded px-2 py-1 w-20 text-xs"
-                  />
+              {deviceMetrics.map((metric: string) => (
+                <div key={metric}>
+                  <label className="block text-xs mb-1 capitalize">{metric}</label>
+                  <div className="flex gap-2">
+                    <select
+                      value={config[selectedDevice]?.[metric]?.operator || ">"}
+                      onChange={e =>
+                        setConfig({
+                          ...config,
+                          [selectedDevice]: {
+                            ...config[selectedDevice],
+                            [metric]: {
+                              ...config[selectedDevice]?.[metric],
+                              operator: e.target.value,
+                            },
+                          },
+                        })
+                      }
+                      className="border rounded px-2 py-1 text-xs"
+                    >
+                      <option value=">">&gt;</option>
+                      <option value="<">&lt;</option>
+                      <option value=">=">&ge;</option>
+                      <option value="<=">&le;</option>
+                    </select>
+                    <input
+                      type="number"
+                      value={config[selectedDevice]?.[metric]?.value || ""}
+                      onChange={e =>
+                        setConfig({
+                          ...config,
+                          [selectedDevice]: {
+                            ...config[selectedDevice],
+                            [metric]: {
+                              ...config[selectedDevice]?.[metric],
+                              value: Number(e.target.value),
+                            },
+                          },
+                        })
+                      }
+                      className="border rounded px-2 py-1 w-20 text-xs"
+                    />
+                  </div>
                 </div>
-              </div>
+              ))}
               <Button type="submit" variant="outline">Save</Button>
             </form>
           </div>

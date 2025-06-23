@@ -6,6 +6,19 @@ import { createObjectCsvWriter } from "csv-writer";
 const QUEUE = "telemetry";
 const CSV_FILE = "messages_log.csv";
 
+const DEVICE_CONFIG = {
+  "device-1": { metrics: ["temperature", "humidity"] },
+  "device-2": { metrics: ["air_pressure", "exhaust"] },
+  "device-3": { metrics: ["co2", "temperature"] },
+  "device-4": { metrics: ["humidity", "exhaust"] },
+  "device-5": { metrics: ["air_pressure", "co2"] },
+  "device-6": { metrics: ["temperature", "humidity"] },
+  "device-7": { metrics: ["exhaust", "co2"] },
+  "device-8": { metrics: ["temperature", "air_pressure"] },
+  "device-9": { metrics: ["humidity", "co2"] },
+  "device-10": { metrics: ["exhaust", "air_pressure"] },
+};
+
 const csvWriter = createObjectCsvWriter({
   path: CSV_FILE,
   header: [
@@ -17,7 +30,7 @@ const csvWriter = createObjectCsvWriter({
     { id: "ticket_number", title: "Ticket Number" },
     { id: "msg", title: "Message" },
   ],
-  append: fs.existsSync(CSV_FILE), // Append if file exists
+  append: fs.existsSync(CSV_FILE),
 });
 
 async function getRules() {
@@ -30,8 +43,8 @@ async function getAlarms() {
   return data.alarms;
 }
 
-function checkRule(type, value, rules) {
-  const rule = rules[type];
+function checkRule(deviceId, type, value, rules) {
+  const rule = rules[deviceId]?.[type];
   if (!rule) return false;
   switch (rule.operator) {
     case ">":
@@ -48,13 +61,11 @@ function checkRule(type, value, rules) {
 }
 
 function isInvalidData(data, rules) {
-  // Unknown metric
-  if (!["temperature", "humidity"].includes(data.type)) return true;
-  // Out-of-range value (customize as needed)
-  if (data.type === "temperature" && (data.value < -50 || data.value > 500))
-    return true;
-  if (data.type === "humidity" && (data.value < 0 || data.value > 100))
-    return true;
+  // Only allow metrics defined for the device
+  const allowedMetrics = DEVICE_CONFIG[data.deviceId]?.metrics || [];
+  if (!allowedMetrics.includes(data.type)) return true;
+  // Check if rule exists for this device and metric
+  if (!rules[data.deviceId] || !rules[data.deviceId][data.type]) return true;
   return false;
 }
 
@@ -62,10 +73,14 @@ async function start() {
   const conn = await amqp.connect("amqp://localhost:5672");
   const ch = await conn.createChannel();
   await ch.assertQueue(QUEUE);
+
   setInterval(async () => {
-    const type = Math.random() > 0.5 ? "temperature" : "humidity";
+    // Pick a random device and metric
+    const deviceIds = Object.keys(DEVICE_CONFIG);
+    const deviceId = deviceIds[Math.floor(Math.random() * deviceIds.length)];
+    const metrics = DEVICE_CONFIG[deviceId].metrics;
+    const type = metrics[Math.floor(Math.random() * metrics.length)];
     const value = Math.floor(Math.random() * 120);
-    const deviceId = `device-${Math.ceil(Math.random() * 10)}`;
     const timestamp = new Date().toISOString();
     const msg = JSON.stringify({
       type,
@@ -83,18 +98,7 @@ async function start() {
       value,
       timestamp,
     });
-  }, 60 * 500);
-
-  setInterval(() => {
-    const msg = JSON.stringify({
-      type: "pressure", // invalid metric
-      value: 200,
-      deviceId: "device-invalid",
-      timestamp: new Date().toISOString(),
-    });
-    ch.sendToQueue(QUEUE, Buffer.from(msg));
-    console.log("Sent invalid:", msg);
-  }, 5 * 60 * 1000);
+  }, 10000);
 
   ch.consume(QUEUE, async (msg) => {
     if (msg !== null) {
@@ -117,9 +121,7 @@ async function start() {
           metric: data.type,
           value: data.value,
           timestamp: data.timestamp,
-          reason: !["temperature", "humidity"].includes(data.type)
-            ? "Unknown metric"
-            : "Out-of-range value",
+          reason: "Invalid metric for device",
         });
         ch.ack(msg);
         return;
@@ -130,8 +132,7 @@ async function start() {
         (a) => a.deviceId === data.deviceId && a.category === data.type
       );
 
-      const isAboveThreshold = checkRule(data.type, data.value, rules);
-
+      const isAboveThreshold = checkRule(data.deviceId, data.type, data.value, rules);
       let ticket_status = "none";
       let ticket_number = "";
 
@@ -149,21 +150,11 @@ async function start() {
         ticket_number = existingAlarm.ticket_number;
       } else if (isAboveThreshold) {
         const res = await axios.post("http://localhost:4000/api/alarms", {
-          ticket_number: Date.now(),
-          name: `${
-            data.type === "temperature" ? "Temperature Alert" : "Humidity Alert"
-          } for Device ${data.deviceId}`,
-          priority: data.type === "temperature" ? "high" : "medium",
-          status: "open",
-          site__display_name: "Demo Site",
-          last_updated_at: data.timestamp,
-          assignee__username: "system",
           deviceId: data.deviceId,
-          category: data.type,
-          config: rules,
-          value: data.value,
           metric: data.type,
+          value: data.value,
           timestamp: data.timestamp,
+          config: rules,
         });
         ticket_status = "generated";
         ticket_number = res.data.alarm?.ticket_number || "";

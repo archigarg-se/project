@@ -1,15 +1,13 @@
 import React from 'react';
 import { buttonVariants } from './ui/button';
 import axios from "axios";
+import { DEVICE_CONFIG } from "../lib/utils";
 import { useAlarmFormStore } from "../stores/alarmForm";
 
 type AlarmFormProps = {
   onClose: () => void;
   onSuccess: () => void;
-  config: {
-    temperature: { operator: string; value: number };
-    humidity: { operator: string; value: number };
-  };
+  config: any;
 };
 
 const AlarmForm: React.FC<AlarmFormProps> = ({ onClose, onSuccess, config }) => {
@@ -27,6 +25,9 @@ const AlarmForm: React.FC<AlarmFormProps> = ({ onClose, onSuccess, config }) => 
     resetForm();
   }, [resetForm]);
 
+  // Get metrics for selected device
+  const metrics = DEVICE_CONFIG[form.deviceId]?.metrics || [];
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setForm({ [e.target.name]: e.target.value });
   };
@@ -41,7 +42,7 @@ const AlarmForm: React.FC<AlarmFormProps> = ({ onClose, onSuccess, config }) => 
         metric: form.metric,
         value: Number(form.value),
         timestamp: form.timestamp,
-        site__display_name: form.site__display_name,
+        site__display_name: DEVICE_CONFIG[form.deviceId]?.site,
         config,
       };
       const res = await fetch('/api/alarms', {
@@ -82,32 +83,32 @@ const AlarmForm: React.FC<AlarmFormProps> = ({ onClose, onSuccess, config }) => 
       <div className="bg-white p-6 rounded shadow-lg w-full max-w-md">
         <h2 className="text-lg font-bold mb-4">Simulate Telemetry</h2>
         <form onSubmit={handleSubmit} className="space-y-3">
-          <input
+          <select
             name="deviceId"
-            placeholder="Device ID"
             value={form.deviceId}
             onChange={handleChange}
             className="w-full border p-2 rounded"
             required
-          />
-          <input
-            name="site__display_name"
-            placeholder="Site Display Name"
-            value={form.site__display_name}
-            onChange={handleChange}
-            className="w-full border p-2 rounded"
-            required
-          />
+          >
+            <option value="">Select Device</option>
+            {Object.keys(DEVICE_CONFIG).map((deviceId) => (
+              <option key={deviceId} value={deviceId}>
+                {deviceId} ({DEVICE_CONFIG[deviceId].site})
+              </option>
+            ))}
+          </select>
           <select
             name="metric"
             value={form.metric}
             onChange={handleChange}
             className="w-full border p-2 rounded"
             required
+            disabled={!form.deviceId}
           >
             <option value="">Select Metric</option>
-            <option value="temperature">Temperature</option>
-            <option value="humidity">Humidity</option>
+            {metrics.map((metric: string) => (
+              <option key={metric} value={metric}>{metric}</option>
+            ))}
           </select>
           <input
             name="value"
