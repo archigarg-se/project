@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import React from "react";
+import {useEffect, useRef } from "react";
 import axios from "axios";
 import { DataTable } from "./components/ui/data-table";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -10,7 +11,8 @@ import { useAlarmsStore } from "./stores/alarms";
 import { useConfigStore } from "./stores/config";
 import { useUIStore } from "./stores/ui";
 import { useAuthStore } from "./stores/auth";
-import { DEVICE_CONFIG } from "./lib/utils";
+import { getRandomDeviceConfig } from "./lib/utils";
+
 
 const BACKEND_MODE = import.meta.env.VITE_BACKEND_MODE;
 const apiBase = BACKEND_MODE === "server" ? "http://localhost:4000" : "";
@@ -20,16 +22,16 @@ function App() {
   // Zustand stores
   const { alarms, setAlarms, loading, setLoading } = useAlarmsStore();
   const {
-  config,
-  showConfig,
-  setConfig,
-  setShowConfig,
-} = useConfigStore() as {
-  config: { [deviceId: string]: { [metric: string]: { operator: string; value: number } } };
-  showConfig: boolean;
-  setConfig: (c: any) => void;
-  setShowConfig: (b: boolean) => void;
-};
+    config,
+    showConfig,
+    setConfig,
+    setShowConfig,
+  } = useConfigStore() as {
+    config: { [deviceId: string]: { [metric: string]: { operator: string; value: number } } };
+    showConfig: boolean;
+    setConfig: (c: any) => void;
+    setShowConfig: (b: boolean) => void;
+  };
   const {
     showForm,
     setShowForm,
@@ -41,12 +43,22 @@ function App() {
     setSelectedDevice,
   } = useUIStore();
   const { token, loginError, setToken, setUser, setLoginError } = useAuthStore();
-
+  
+  const DEVICE_CONFIG = React.useMemo(() => getRandomDeviceConfig(), [showConfig]);
   const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
+  const refreshAlarms = React.useCallback(async () => {
+    setLoading(true);
+    const res = await axiosInstance.get("/api/alarms", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setAlarms(res.data.alarms);
+    setLoading(false);
+  }, [setAlarms, setLoading, token]);
 
+
+ 
   useEffect(() => {
     if (import.meta.env.VITE_BACKEND_MODE === "msw") {
-      // Simulate telemetry for MSW/dev mode
       const intervals: NodeJS.Timeout[] = [];
       Object.keys(DEVICE_CONFIG).forEach((deviceId) => {
         DEVICE_CONFIG[deviceId].metrics.forEach((metric: string) => {
@@ -202,7 +214,7 @@ function App() {
             <span className="text-black-600 font-semibold">snoozed</span>
           );
         }
-        if (status === "unsnoozed") {
+        if (status === "un-snoozed") {
           return (
             <span className="text-black-600 font-semibold">unsnoozed</span>
           );
@@ -240,6 +252,7 @@ function App() {
           Logout
         </Button>
       </header>
+      
       <Button
         className="mb-2 mr-4 ml-4 px-3 py-1"
         variant="outline"
@@ -272,7 +285,7 @@ function App() {
                 >
                   {Object.keys(DEVICE_CONFIG).map((deviceId) => (
                     <option key={deviceId} value={deviceId}>
-                      {deviceId} ({DEVICE_CONFIG[deviceId].site})
+                      {deviceId}
                     </option>
                   ))}
                 </select>
@@ -365,6 +378,7 @@ function App() {
               setModalVisible(false);
               setTimeout(() => setModalAlarm(null), 400);
             }}
+            onStatusChange={refreshAlarms} 
           />
         </div>
       )}

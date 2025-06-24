@@ -15,9 +15,11 @@ const BACKEND_MODE = import.meta.env.VITE_BACKEND_MODE;
 function AlarmHoverCard({
   alarm,
   onClose,
+  onStatusChange,
 }: {
   alarm: any;
   onClose: () => void;
+  onStatusChange: () => void;
 }) {
   const modalRef = useRef<HTMLDivElement>(null);
   const {
@@ -56,6 +58,7 @@ function AlarmHoverCard({
     });
     if (res.data.alarm) {
       setStatus(res.data.alarm.status);
+      onStatusChange();
     }
     onClose();
   };
@@ -73,7 +76,6 @@ function AlarmHoverCard({
       .then((res) => setHistory(res.data));
   }, [alarm.deviceId, alarm.category, setHistory]);
 
-  // Close on outside click
   useEffect(() => {
     function handleClick(event: MouseEvent) {
       if (

@@ -1,8 +1,10 @@
 import React from 'react';
 import { buttonVariants } from './ui/button';
 import axios from "axios";
-import { DEVICE_CONFIG } from "../lib/utils";
 import { useAlarmFormStore } from "../stores/alarmForm";
+
+import { getRandomDeviceConfig } from "../lib/utils";
+
 
 type AlarmFormProps = {
   onClose: () => void;
@@ -11,6 +13,7 @@ type AlarmFormProps = {
 };
 
 const AlarmForm: React.FC<AlarmFormProps> = ({ onClose, onSuccess, config }) => {
+  const DEVICE_CONFIG = getRandomDeviceConfig();
   const {
     form,
     loading,
@@ -93,7 +96,7 @@ const AlarmForm: React.FC<AlarmFormProps> = ({ onClose, onSuccess, config }) => 
             <option value="">Select Device</option>
             {Object.keys(DEVICE_CONFIG).map((deviceId) => (
               <option key={deviceId} value={deviceId}>
-                {deviceId} ({DEVICE_CONFIG[deviceId].site})
+                {deviceId}
               </option>
             ))}
           </select>

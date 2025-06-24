@@ -6,6 +6,18 @@ import { createObjectCsvWriter } from "csv-writer";
 const QUEUE = "telemetry";
 const CSV_FILE = "messages_log.csv";
 
+const SITES = [
+  "Aerocity", "Delhi", "Mumbai", "Chennai", "Bangalore",
+  "Hyderabad", "Pune", "Kolkata", "Ahmedabad", "Jaipur"
+];
+const ASSIGNEES = [
+  "Archi", "Aryan", "Abhinav", "Tanvi", "Ridhima",
+  "Aarav", "Divyam", "Shubham", "Ishaan", "Sara"
+];
+function getRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
 const DEVICE_CONFIG = {
   "device-1": { metrics: ["temperature", "humidity"] },
   "device-2": { metrics: ["air_pressure", "exhaust"] },
@@ -61,11 +73,10 @@ function checkRule(deviceId, type, value, rules) {
 }
 
 function isInvalidData(data, rules) {
-  // Only allow metrics defined for the device
   const allowedMetrics = DEVICE_CONFIG[data.deviceId]?.metrics || [];
   if (!allowedMetrics.includes(data.type)) return true;
-  // Check if rule exists for this device and metric
   if (!rules[data.deviceId] || !rules[data.deviceId][data.type]) return true;
+  if (typeof data.value !== "number" || isNaN(data.value)) return true;
   return false;
 }
 
@@ -82,11 +93,16 @@ async function start() {
     const type = metrics[Math.floor(Math.random() * metrics.length)];
     const value = Math.floor(Math.random() * 120);
     const timestamp = new Date().toISOString();
+    // Randomize site and assignee for each message
+    const site = getRandom(SITES);
+    const assignee = getRandom(ASSIGNEES);
     const msg = JSON.stringify({
       type,
       value,
       deviceId,
       timestamp,
+      site,
+      assignee,
     });
     ch.sendToQueue(QUEUE, Buffer.from(msg));
     console.log("Sent:", msg);
@@ -105,6 +121,7 @@ async function start() {
       const data = JSON.parse(msg.content.toString());
       const rules = await getRules();
       if (isInvalidData(data, rules)) {
+        // Just log or skip, do not call any endpoint
         await csvWriter.writeRecords([
           {
             timestamp: data.timestamp,
@@ -116,17 +133,9 @@ async function start() {
             msg: JSON.stringify(data),
           },
         ]);
-        await axios.post("http://localhost:4000/api/invalid-ticket", {
-          deviceId: data.deviceId,
-          metric: data.type,
-          value: data.value,
-          timestamp: data.timestamp,
-          reason: "Invalid metric for device",
-        });
         ch.ack(msg);
         return;
       }
-
       const alarms = await getAlarms();
       const existingAlarm = alarms.find(
         (a) => a.deviceId === data.deviceId && a.category === data.type

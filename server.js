@@ -9,91 +9,42 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Device configuration: site, metrics, assignee
+const SITES = [
+  "Aerocity", "Delhi", "Mumbai", "Chennai", "Bangalore",
+  "Hyderabad", "Pune", "Kolkata", "Ahmedabad", "Jaipur"
+];
+const ASSIGNEES = [
+  "Archi", "Aryan", "Abhinav", "Tanvi", "Ridhima",
+  "Aarav", "Divyam", "Shubham", "Ishaan", "Sara"
+];
+function getRandom(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+// Device configuration: metrics per device
 const DEVICE_CONFIG = {
-  "device-1": {
-    site: "Aerocity",
-    metrics: {
-      temperature: { operator: ">", value: 70 },
-      humidity: { operator: ">", value: 90 },
-    },
-    assignee: "aero@site.com",
-  },
-  "device-2": {
-    site: "Delhi",
-    metrics: {
-      air_pressure: { operator: "<", value: 1000 },
-      exhaust: { operator: ">", value: 50 },
-    },
-    assignee: "delhi@site.com",
-  },
-  "device-3": {
-    site: "Mumbai",
-    metrics: {
-      co2: { operator: ">", value: 400 },
-      temperature: { operator: "<", value: 15 },
-    },
-    assignee: "mumbai@site.com",
-  },
-  "device-4": {
-    site: "Chennai",
-    metrics: {
-      humidity: { operator: "<", value: 30 },
-      exhaust: { operator: ">", value: 60 },
-    },
-    assignee: "chennai@site.com",
-  },
-  "device-5": {
-    site: "Bangalore",
-    metrics: {
-      air_pressure: { operator: ">", value: 1100 },
-      co2: { operator: "<", value: 350 },
-    },
-    assignee: "bangalore@site.com",
-  },
-  "device-6": {
-    site: "Hyderabad",
-    metrics: {
-      temperature: { operator: ">", value: 45 },
-      humidity: { operator: "<", value: 20 },
-    },
-    assignee: "hyd@site.com",
-  },
-  "device-7": {
-    site: "Pune",
-    metrics: {
-      exhaust: { operator: "<", value: 10 },
-      co2: { operator: ">", value: 500 },
-    },
-    assignee: "pune@site.com",
-  },
-  "device-8": {
-    site: "Kolkata",
-    metrics: {
-      temperature: { operator: "<", value: 10 },
-      air_pressure: { operator: ">", value: 1200 },
-    },
-    assignee: "kolkata@site.com",
-  },
-  "device-9": {
-    site: "Ahmedabad",
-    metrics: {
-      humidity: { operator: ">", value: 95 },
-      co2: { operator: "<", value: 300 },
-    },
-    assignee: "ahd@site.com",
-  },
-  "device-10": {
-    site: "Jaipur",
-    metrics: {
-      exhaust: { operator: ">", value: 80 },
-      air_pressure: { operator: "<", value: 900 },
-    },
-    assignee: "jaipur@site.com",
-  },
+  "device-1": { metrics: { temperature: { operator: ">", value: 70 }, humidity: { operator: ">", value: 90 } } },
+  "device-2": { metrics: { air_pressure: { operator: "<", value: 1000 }, exhaust: { operator: ">", value: 50 } } },
+  "device-3": { metrics: { co2: { operator: ">", value: 400 }, temperature: { operator: "<", value: 15 } } },
+  "device-4": { metrics: { humidity: { operator: "<", value: 30 }, exhaust: { operator: ">", value: 60 } } },
+  "device-5": { metrics: { air_pressure: { operator: ">", value: 1100 }, co2: { operator: "<", value: 350 } } },
+  "device-6": { metrics: { temperature: { operator: ">", value: 45 }, humidity: { operator: "<", value: 20 } } },
+  "device-7": { metrics: { exhaust: { operator: "<", value: 10 }, co2: { operator: ">", value: 500 } } },
+  "device-8": { metrics: { temperature: { operator: "<", value: 10 }, air_pressure: { operator: ">", value: 1200 } } },
+  "device-9": { metrics: { humidity: { operator: ">", value: 95 }, co2: { operator: "<", value: 300 } } },
+  "device-10": { metrics: { exhaust: { operator: ">", value: 80 }, air_pressure: { operator: "<", value: 900 } } },
 };
 
-// Initial rules: copy from DEVICE_CONFIG
+// --- THIS FUNCTION PREVENTS INVALID DATA FROM CREATING TICKETS ---
+function isInvalidData(deviceId, metric, value, rules) {
+  const allowedMetrics = Object.keys(DEVICE_CONFIG[deviceId]?.metrics || {});
+  if (!allowedMetrics.includes(metric)) return true;
+  if (!rules[deviceId] || !rules[deviceId][metric]) return true;
+  if (typeof value !== "number" || isNaN(value)) return true;
+  return false;
+}
+
+// Rules object (copied from DEVICE_CONFIG at startup, can be changed via API)
 let rules = {};
 for (const deviceId in DEVICE_CONFIG) {
   rules[deviceId] = { ...DEVICE_CONFIG[deviceId].metrics };
@@ -160,21 +111,21 @@ app.post("/api/alarms", async (req, res) => {
     }
     return res.json({ alarm: alarms[alarmIdx] });
   }
-
+  if (isInvalidData(req.body.deviceId, req.body.metric, req.body.value, rules)) {
+    // No ticket, just skip
+    return res.json({ message: "Invalid data, no ticket generated" });
+  }
   // Otherwise, create new alarm
-  const deviceConf = DEVICE_CONFIG[req.body.deviceId] || {};
   const alarm = {
     ticket_number: Date.now(),
     name:
       req.body.name ||
       `${req.body.metric ? req.body.metric.charAt(0).toUpperCase() + req.body.metric.slice(1) : "Metric"} Alert for Device ${req.body.deviceId}`,
-    priority:
-      req.body.priority ||
-      "high",
+    priority: req.body.priority || "high",
     status: req.body.status || "open",
-    site__display_name: deviceConf.site || req.body.site__display_name || "Demo Site",
+    site__display_name: getRandom(SITES),
     last_updated_at: req.body.timestamp || now,
-    assignee__username: deviceConf.assignee || req.body.assignee__username || "system",
+    assignee__username: getRandom(ASSIGNEES),
     deviceId: req.body.deviceId,
     category: req.body.metric,
     config: req.body.config,
@@ -204,19 +155,7 @@ app.post("/api/rules", (req, res) => {
 });
 
 app.get("/api/device-config", (req, res) => {
-  // For frontend: get device/metric/site/assignee map
   res.json(DEVICE_CONFIG);
-});
-
-app.post("/api/invalid-ticket", async (req, res) => {
-  const { deviceId, metric, value, timestamp, reason } = req.body;
-  await sendMail(
-    "Invalid Telemetry Detected",
-    `Invalid telemetry received:\nDevice: ${deviceId}\nMetric: ${metric}\nValue: ${value}\nTimestamp: ${timestamp}\nReason: ${
-      reason || "Unknown"
-    }`
-  );
-  res.json({ ok: true });
 });
 
 // SNOOZE ENDPOINT
@@ -278,7 +217,6 @@ app.post("/api/acknowledge", async (req, res) => {
 
 let telemetryHistory = []; // { deviceId, metric, value, timestamp }
 
-// TELEMETRY ENDPOINT (send email here)
 app.post("/api/telemetry", async (req, res) => {
   const { deviceId, metric, value, timestamp } = req.body;
   telemetryHistory.push({ deviceId, metric, value, timestamp });
