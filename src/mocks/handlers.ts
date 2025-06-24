@@ -31,13 +31,19 @@ for (const deviceId in DEVICE_CONFIG) {
     rules[deviceId][metric] = { operator: ">", value: 50 }; 
   }
 }
+let telemetryHistory: {
+  deviceId: string;
+  metric: string;
+  value: number;
+  timestamp: string;
+  site?: string;
+  assignee?: string;
+}[] = [];
 
-let telemetryHistory: { deviceId: string; metric: string; value: number; timestamp: string }[] = [];
 const mockAlarms: { alarms: any[] } = { alarms: [] };
 const DEMO_USER = { username: "admin", password: "password" };
 
 export const handlers = [
-  // Login
   http.post('/api/login', async ({ request }) => {
     const { username, password } = await request.json() as { username: string; password: string };
     if (username === DEMO_USER.username && password === DEMO_USER.password) {
@@ -47,7 +53,6 @@ export const handlers = [
     return HttpResponse.json({ message: "Invalid credentials" }, { status: 401 });
   }),
 
-  // Get alarms
   http.get('/api/alarms', async ({ request }) => {
     const auth = request.headers.get("authorization");
     if (!auth || !auth.startsWith("Bearer ")) {
@@ -59,49 +64,51 @@ export const handlers = [
     }
     return HttpResponse.json({ alarms: mockAlarms.alarms });
   }),
-  // Get rules
+  
   http.get('/api/rules', async () => {
   return HttpResponse.json(rules as Record<string, Record<string, { operator: string; value: number }>>);
 }),
 
-  // Set rules
   http.post('/api/rules', async ({ request }) => {
     rules = await request.json()as Record<string, Record<string, { operator: string; value: number }>>;
     return HttpResponse.json(rules);
   }),
 
-  // Telemetry (for chart/history)
   http.post('/api/telemetry', async ({ request }) => {
-    const { deviceId, metric, value, timestamp } = await request.json() as { deviceId: string; metric: string; value: number; timestamp: string };
-    telemetryHistory.push({ deviceId, metric, value, timestamp });
-    // Keep only last 60 minutes
-    const cutoff = Date.now() - 60 * 60 * 1000;
-    telemetryHistory = telemetryHistory.filter(
-      (d) => new Date(d.timestamp).getTime() >= cutoff
-    );
-    return HttpResponse.json({ ok: true });
-  }),
-
-  // Device history for chart
-  http.get('/api/history', async ({ request }) => {
-    const url = new URL(request.url);
-    const deviceId = url.searchParams.get("deviceId");
-    const metric = url.searchParams.get("metric");
-    const cutoff = Date.now() - 60 * 60 * 1000;
-    const history = telemetryHistory
-      .filter(
-        (d) =>
-          d.deviceId === deviceId &&
-          d.metric === metric &&
-          new Date(d.timestamp).getTime() >= cutoff
-      )
-      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-    return HttpResponse.json(Array.isArray(history) ? history : []);
-  }),
-
+  const { deviceId, metric, value, timestamp ,site,assignee} = await request.json() as { deviceId: string; metric: string; value: number; timestamp: string; site: string; assignee: string};
+  telemetryHistory.push({
+    deviceId,
+    metric,
+    value,
+    timestamp,
+    site,
+    assignee,
+  });
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  telemetryHistory = telemetryHistory.filter(
+    (d) => new Date(d.timestamp).getTime() >= cutoff
+  );
+  return HttpResponse.json({ ok: true });
+}),
   
 
-  // --- ALARM CREATION/UPDATE ---
+http.get('/api/history', async ({ request }) => {
+  const url = new URL(request.url);
+  const deviceId = url.searchParams.get("deviceId");
+  const metric = url.searchParams.get("metric");
+  const cutoff = Date.now() - 60 * 60 * 1000;
+  const history = telemetryHistory
+    .filter(
+      (d) =>
+        d.deviceId === deviceId &&
+        d.metric === metric &&
+        new Date(d.timestamp).getTime() >= cutoff
+    )
+    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+  return HttpResponse.json(Array.isArray(history) ? history : []);
+}),
+  
+
   http.post('/api/alarms', async ({ request }) => {
     const body = await request.json() as {
       deviceId: string;
@@ -111,37 +118,78 @@ export const handlers = [
       site__display_name?: string;
       config: typeof rules;
       status?: string;
+      comment?: string; 
+      ticket_number?: number; 
     };
-    const { deviceId, metric, value, site__display_name, config, status } = body;
+    const { deviceId, metric, value, site__display_name, config, status, comment, ticket_number } = body;
 
-  
+    // Find by ticket_number if provided, else by device/metric/status
+    let alarm = ticket_number
+      ? mockAlarms.alarms.find((a: any) => a.ticket_number === ticket_number)
+      : mockAlarms.alarms.find(
+          (a: any) => a.deviceId === deviceId && a.category === metric && a.status === "open"
+        );
 
-    // Find existing open alarm for device/metric
-    let alarm = mockAlarms.alarms.find(
-      (a: any) => a.deviceId === deviceId && a.category === metric && a.status === "open"
-    );
-
-    // If alarm exists and status is resolved, update it
+    // ...existing code...
+    // --- RESOLVE LOGIC ---
     if (alarm && status === "resolved") {
       alarm.status = "resolved";
+      alarm.last_updated_at = new Date().toISOString();
+      if (comment) {
+        alarm.comments = alarm.comments || [];
+        alarm.comments.push(comment);
+      }
+      return HttpResponse.json({ alarm });
+    }
+
+    // --- AUTO-RESOLVE LOGIC BASED ON VALUE ---
+    if (alarm) {
+      const rule = rules[deviceId]?.[metric];
+      let shouldBeOpen = false;
+      if (rule) {
+        switch (rule.operator) {
+          case ">":
+            shouldBeOpen = value > rule.value;
+            break;
+          case "<":
+            shouldBeOpen = value < rule.value;
+            break;
+          case ">=":
+            shouldBeOpen = value >= rule.value;
+            break;
+          case "<=":
+            shouldBeOpen = value <= rule.value;
+            break;
+        }
+      }
+      if (!shouldBeOpen && alarm.status === "open") {
+        alarm.status = "resolved";
+        alarm.last_updated_at = new Date().toISOString();
+        if (comment) {
+          alarm.comments = alarm.comments || [];
+          alarm.comments.push(comment);
+        }
+        return HttpResponse.json({ alarm });
+      }
+      // ...existing status change logic...
+      if (["snoozed", "unsnoozed", "acknowledged"].includes(status || "")) {
+        alarm.status = status;
+        alarm.last_updated_at = new Date().toISOString();
+        return HttpResponse.json({ alarm });
+      }
       alarm.last_updated_at = new Date().toISOString();
       return HttpResponse.json({ alarm });
     }
 
-    // If alarm exists and status is snoozed/unsnoozed/acknowledged, update it
     if (alarm && ["snoozed", "unsnoozed", "acknowledged"].includes(status || "")) {
       alarm.status = status;
       alarm.last_updated_at = new Date().toISOString();
       return HttpResponse.json({ alarm });
     }
-
-    // If alarm exists and value still triggers rule, update timestamp
     if (alarm) {
       alarm.last_updated_at = new Date().toISOString();
       return HttpResponse.json({ alarm });
     }
-
-    // Check if value triggers rule
     const rule = rules[deviceId]?.[metric];
     let shouldCreate = false;
     if (rule) {
@@ -184,12 +232,9 @@ export const handlers = [
       mockAlarms.alarms.unshift(alarm);
       return HttpResponse.json({ alarm });
     }
-
-    // If value does not trigger rule, no ticket
     return HttpResponse.json({ message: "No ticket triggered" }, { status: 200 });
   }),
 
-  // --- SNOOZE, UNSNOOZE, ACKNOWLEDGE ---
   http.post("/api/snooze", async ({ request }) => {
     const { ticket_number, comment } = await request.json() as { ticket_number: number; comment: string };
     const alarm = mockAlarms.alarms.find((a: any) => a.ticket_number === ticket_number);

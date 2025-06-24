@@ -38,6 +38,8 @@ const csvWriter = createObjectCsvWriter({
     { id: "deviceId", title: "Device ID" },
     { id: "metric", title: "Metric" },
     { id: "value", title: "Value" },
+    { id: "site", title: "Site" },
+    { id: "assignee", title: "Assignee" },
     { id: "ticket_status", title: "Ticket Status" },
     { id: "ticket_number", title: "Ticket Number" },
     { id: "msg", title: "Message" },
@@ -93,7 +95,7 @@ async function start() {
     const type = metrics[Math.floor(Math.random() * metrics.length)];
     const value = Math.floor(Math.random() * 120);
     const timestamp = new Date().toISOString();
-    // Randomize site and assignee for each message
+    // Randomize site and assignee ONCE here
     const site = getRandom(SITES);
     const assignee = getRandom(ASSIGNEES);
     const msg = JSON.stringify({
@@ -113,6 +115,8 @@ async function start() {
       metric: type,
       value,
       timestamp,
+      site,
+      assignee,
     });
   }, 10000);
 
@@ -128,6 +132,8 @@ async function start() {
             deviceId: data.deviceId,
             metric: data.type,
             value: data.value,
+            site: data.site,
+            assignee: data.assignee,
             ticket_status: "invalid",
             ticket_number: "",
             msg: JSON.stringify(data),
@@ -140,7 +146,6 @@ async function start() {
       const existingAlarm = alarms.find(
         (a) => a.deviceId === data.deviceId && a.category === data.type
       );
-
       const isAboveThreshold = checkRule(data.deviceId, data.type, data.value, rules);
       let ticket_status = "none";
       let ticket_number = "";
@@ -154,6 +159,8 @@ async function start() {
           metric: data.type,
           timestamp: data.timestamp,
           config: rules,
+          site: data.site,
+          assignee: data.assignee,
         });
         ticket_status = isAboveThreshold ? "updated/open" : "resolved";
         ticket_number = existingAlarm.ticket_number;
@@ -164,6 +171,8 @@ async function start() {
           value: data.value,
           timestamp: data.timestamp,
           config: rules,
+          site: data.site,
+          assignee: data.assignee,
         });
         ticket_status = "generated";
         ticket_number = res.data.alarm?.ticket_number || "";
@@ -178,6 +187,8 @@ async function start() {
           deviceId: data.deviceId,
           metric: data.type,
           value: data.value,
+          site: data.site,
+          assignee: data.assignee,
           ticket_status,
           ticket_number,
           msg: JSON.stringify(data),
@@ -189,6 +200,8 @@ async function start() {
         metric: data.type,
         value: data.value,
         timestamp: data.timestamp,
+        site: data.site,
+        assignee: data.assignee,
       });
 
       ch.ack(msg);

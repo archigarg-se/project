@@ -93,12 +93,18 @@ app.post("/api/alarms", async (req, res) => {
     (a) => a.deviceId === req.body.deviceId && a.category === req.body.metric
   );
 
+  // Use provided site/assignee if present, else randomize (for backward compatibility)
+  const site__display_name = req.body.site__display_name || req.body.site || getRandom(SITES);
+  const assignee__username = req.body.assignee__username || req.body.assignee || getRandom(ASSIGNEES);
+
   if (alarmIdx !== -1) {
     // Update status and info, never create a new ticket for same device/metric
     const wasOpen = alarms[alarmIdx].status === "open";
     alarms[alarmIdx] = {
       ...alarms[alarmIdx],
       ...req.body,
+      site__display_name,
+      assignee__username,
       last_updated_at: req.body.timestamp || now,
       status: req.body.status || alarms[alarmIdx].status,
     };
@@ -123,9 +129,9 @@ app.post("/api/alarms", async (req, res) => {
       `${req.body.metric ? req.body.metric.charAt(0).toUpperCase() + req.body.metric.slice(1) : "Metric"} Alert for Device ${req.body.deviceId}`,
     priority: req.body.priority || "high",
     status: req.body.status || "open",
-    site__display_name: getRandom(SITES),
+    site__display_name,
     last_updated_at: req.body.timestamp || now,
-    assignee__username: getRandom(ASSIGNEES),
+    assignee__username,
     deviceId: req.body.deviceId,
     category: req.body.metric,
     config: req.body.config,
@@ -215,11 +221,11 @@ app.post("/api/acknowledge", async (req, res) => {
   }
 });
 
-let telemetryHistory = []; // { deviceId, metric, value, timestamp }
+let telemetryHistory = []; // { deviceId, metric, value, timestamp, site, assignee }
 
 app.post("/api/telemetry", async (req, res) => {
-  const { deviceId, metric, value, timestamp } = req.body;
-  telemetryHistory.push({ deviceId, metric, value, timestamp });
+  const { deviceId, metric, value, timestamp, site, assignee } = req.body;
+  telemetryHistory.push({ deviceId, metric, value, timestamp, site, assignee });
   // Keep only last 60 minutes
   const cutoff = Date.now() - 60 * 60 * 1000;
   telemetryHistory = telemetryHistory.filter(

@@ -1,5 +1,5 @@
 import React from "react";
-import {useEffect, useRef } from "react";
+import { useEffect, useRef } from "react";
 import axios from "axios";
 import { DataTable } from "./components/ui/data-table";
 import type { ColumnDef } from "@tanstack/react-table";
@@ -13,10 +13,18 @@ import { useUIStore } from "./stores/ui";
 import { useAuthStore } from "./stores/auth";
 import { getRandomDeviceConfig } from "./lib/utils";
 
-
 const BACKEND_MODE = import.meta.env.VITE_BACKEND_MODE;
 const apiBase = BACKEND_MODE === "server" ? "http://localhost:4000" : "";
 const axiosInstance = axios.create({ baseURL: apiBase });
+
+// const SITES = [
+//   "Aerocity", "Delhi", "Mumbai", "Chennai", "Bangalore",
+//   "Hyderabad", "Pune", "Kolkata", "Ahmedabad", "Jaipur"
+// ];
+// const ASSIGNEES = [
+//   "Archi", "Aryan", "Abhinav", "Tanvi", "Ridhima",
+//   "Aarav", "Divyam", "Shubham", "Ishaan", "Sara"
+// ];
 
 function App() {
   // Zustand stores
@@ -43,7 +51,7 @@ function App() {
     setSelectedDevice,
   } = useUIStore();
   const { token, loginError, setToken, setUser, setLoginError } = useAuthStore();
-  
+
   const DEVICE_CONFIG = React.useMemo(() => getRandomDeviceConfig(), [showConfig]);
   const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
   const refreshAlarms = React.useCallback(async () => {
@@ -55,33 +63,34 @@ function App() {
     setLoading(false);
   }, [setAlarms, setLoading, token]);
 
+  // useEffect(() => {
+  //   if (import.meta.env.VITE_BACKEND_MODE === "msw") {
+  //     const intervals: NodeJS.Timeout[] = [];
+  //     Object.keys(DEVICE_CONFIG).forEach((deviceId) => {
+  //       DEVICE_CONFIG[deviceId].metrics.forEach((metric: string) => {
+  //         const interval = setInterval(() => {
+  //           const site = SITES[Math.floor(Math.random() * SITES.length)];
+  //           const assignee = ASSIGNEES[Math.floor(Math.random() * ASSIGNEES.length)];
+  //           fetch("/api/telemetry", {
+  //             method: "POST",
+  //             headers: { "Content-Type": "application/json" },
+  //             body: JSON.stringify({
+  //               deviceId,
+  //               metric,
+  //               value: 50 + Math.round(Math.random() * 50),
+  //               timestamp: new Date().toISOString(),
+  //               site,
+  //               assignee,
+  //             }),
+  //           });
+  //         }, 10000);
+  //         intervals.push(interval);
+  //       });
+  //     });
+  //     return () => intervals.forEach(clearInterval);
+  //   }
+  // }, [DEVICE_CONFIG]);
 
- 
-  useEffect(() => {
-    if (import.meta.env.VITE_BACKEND_MODE === "msw") {
-      const intervals: NodeJS.Timeout[] = [];
-      Object.keys(DEVICE_CONFIG).forEach((deviceId) => {
-        DEVICE_CONFIG[deviceId].metrics.forEach((metric: string) => {
-          const interval = setInterval(() => {
-            fetch("/api/telemetry", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                deviceId,
-                metric,
-                value: 50 + Math.round(Math.random() * 50),
-                timestamp: new Date().toISOString(),
-              }),
-            });
-          }, 10000);
-          intervals.push(interval);
-        });
-      });
-      return () => intervals.forEach(clearInterval);
-    }
-  }, []);
-
-  // Fetch rules from backend/MSW on mount or when config modal closes
   useEffect(() => {
     if (!token) return;
     axiosInstance.get("/api/rules").then((res) => {
@@ -89,7 +98,6 @@ function App() {
     });
   }, [token, showConfig, setConfig]);
 
-  // Fetch alarms on mount
   useEffect(() => {
     if (!token) return;
     setLoading(true);
@@ -101,7 +109,6 @@ function App() {
     });
   }, [token, setAlarms, setLoading]);
 
-  // Show login form if not authenticated
   if (!token) {
     return (
       <div className="flex ml-120 items-center justify-center bg-gray-50">
@@ -252,7 +259,7 @@ function App() {
           Logout
         </Button>
       </header>
-      
+
       <Button
         className="mb-2 mr-4 ml-4 px-3 py-1"
         variant="outline"
@@ -378,7 +385,7 @@ function App() {
               setModalVisible(false);
               setTimeout(() => setModalAlarm(null), 400);
             }}
-            onStatusChange={refreshAlarms} 
+            onStatusChange={refreshAlarms}
           />
         </div>
       )}
