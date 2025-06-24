@@ -1,33 +1,21 @@
-import React from "react";
-import { useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import axios from "axios";
-import { DataTable } from "./components/ui/data-table";
-import type { ColumnDef } from "@tanstack/react-table";
-import AlarmForm from "./components/AlarmForm";
-import AlarmHoverCard from "./components/AlarmHoverCard";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { useAlarmsStore } from "./stores/alarms";
+import type { Alarm } from "./stores/alarms";
 import { useConfigStore } from "./stores/config";
 import { useUIStore } from "./stores/ui";
 import { useAuthStore } from "./stores/auth";
 import { getRandomDeviceConfig } from "./lib/utils";
 import InvalidDataButton from "./components/invalid";
+import { useFiltersStore } from "./stores/filters";
+import AlarmForm from "./components/AlarmForm";
+import AlarmHoverCard from "./components/AlarmHoverCard";
 
 const BACKEND_MODE = import.meta.env.VITE_BACKEND_MODE;
 const apiBase = BACKEND_MODE === "server" ? "http://localhost:4000" : "";
 const axiosInstance = axios.create({ baseURL: apiBase });
-
-// const SITES = [
-//   "Aerocity", "Delhi", "Mumbai", "Chennai", "Bangalore",
-//   "Hyderabad", "Pune", "Kolkata", "Ahmedabad", "Jaipur"
-// ];
-// const ASSIGNEES = [
-//   "Archi", "Aryan", "Abhinav", "Tanvi", "Ridhima",
-//   "Aarav", "Divyam", "Shubham", "Ishaan", "Sara"
-// ];
-
-
 
 function App() {
   // Zustand stores
@@ -37,12 +25,7 @@ function App() {
     showConfig,
     setConfig,
     setShowConfig,
-  } = useConfigStore() as {
-    config: { [deviceId: string]: { [metric: string]: { operator: string; value: number } } };
-    showConfig: boolean;
-    setConfig: (c: any) => void;
-    setShowConfig: (b: boolean) => void;
-  };
+  } = useConfigStore();
   const {
     showForm,
     setShowForm,
@@ -55,8 +38,17 @@ function App() {
   } = useUIStore();
   const { token, loginError, setToken, setUser, setLoginError } = useAuthStore();
 
+  // Zustand filters store
+  const filters = useFiltersStore();
+  const setFilter = useFiltersStore((s) => s.setFilter);
+  const resetFilters = useFiltersStore((s) => s.resetFilters);
+  const sortBy = useFiltersStore((s) => s.sortBy);
+  const sortOrder = useFiltersStore((s) => s.sortOrder);
+  const setSort = useFiltersStore((s) => s.setSort);
+
   const DEVICE_CONFIG = React.useMemo(() => getRandomDeviceConfig(), [showConfig]);
   const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
+
   const refreshAlarms = React.useCallback(async () => {
     setLoading(true);
     const res = await axiosInstance.get("/api/alarms", {
@@ -65,34 +57,6 @@ function App() {
     setAlarms(res.data.alarms);
     setLoading(false);
   }, [setAlarms, setLoading, token]);
-
-  // useEffect(() => {
-  //   if (import.meta.env.VITE_BACKEND_MODE === "msw") {
-  //     const intervals: NodeJS.Timeout[] = [];
-  //     Object.keys(DEVICE_CONFIG).forEach((deviceId) => {
-  //       DEVICE_CONFIG[deviceId].metrics.forEach((metric: string) => {
-  //         const interval = setInterval(() => {
-  //           const site = SITES[Math.floor(Math.random() * SITES.length)];
-  //           const assignee = ASSIGNEES[Math.floor(Math.random() * ASSIGNEES.length)];
-  //           fetch("/api/telemetry", {
-  //             method: "POST",
-  //             headers: { "Content-Type": "application/json" },
-  //             body: JSON.stringify({
-  //               deviceId,
-  //               metric,
-  //               value: 50 + Math.round(Math.random() * 50),
-  //               timestamp: new Date().toISOString(),
-  //               site,
-  //               assignee,
-  //             }),
-  //           });
-  //         }, 10000);
-  //         intervals.push(interval);
-  //       });
-  //     });
-  //     return () => intervals.forEach(clearInterval);
-  //   }
-  // }, [DEVICE_CONFIG]);
 
   useEffect(() => {
     if (!token) return;
@@ -183,73 +147,60 @@ function App() {
 
   const deviceMetrics = DEVICE_CONFIG[selectedDevice]?.metrics || [];
 
-  const columns: ColumnDef<any>[] = [
-    {
-      accessorKey: "ticket_number",
-      header: "Ticket ID",
-      cell: ({ row }) => (
-        <span
-          className="underline text-blue-700 cursor-pointer"
-          onMouseEnter={() => {
-            if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
-            hoverTimeout.current = setTimeout(() => {
-              setModalAlarm(row.original);
-              setModalVisible(true);
-            }, 200);
-          }}
-          onMouseLeave={() => {
-            if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
-            setModalVisible(false);
-            setTimeout(() => setModalAlarm(null), 200);
-          }}
-        >
-          {row.original.ticket_number}
-        </span>
-      ),
-    },
-    { accessorKey: "name", header: "Name" },
-    { accessorKey: "priority", header: "Priority" },
-    {
-      accessorKey: "status",
-      header: "Status",
-      cell: ({ row }) => {
-        const status = row.original.status;
-        if (status === "open") {
-          return (
-            <span className="text-red-600 font-semibold">active</span>
-          );
-        }
-        if (status === "snoozed") {
-          return (
-            <span className="text-black-600 font-semibold">snoozed</span>
-          );
-        }
-        if (status === "un-snoozed") {
-          return (
-            <span className="text-black-600 font-semibold">unsnoozed</span>
-          );
-        }
-        if (status === "acknowledged") {
-          return (
-            <span className="text-black-600 font-semibold">acknowledged</span>
-          );
-        }
-        if (status === "resolved") {
-          return (
-            <span className="text-green-600 font-semibold">resolved</span>
-          );
-        }
-        return <span>{status}</span>;
-      },
-    },
-    { accessorKey: "site__display_name", header: "Site" },
-    { accessorKey: "last_updated_at", header: "Last Updated" },
-    { accessorKey: "assignee__username", header: "Assignee" },
+  // Filtering logic
+  const filteredAlarms = alarms.filter(alarm =>
+    (!filters.ticket_number || alarm.ticket_number.toString().includes(filters.ticket_number)) &&
+    (!filters.name || alarm.name?.toLowerCase().includes(filters.name.toLowerCase())) &&
+    (!filters.priority || alarm.priority?.toLowerCase().includes(filters.priority.toLowerCase())) &&
+    (!filters.status || alarm.status?.toLowerCase().includes(filters.status.toLowerCase())) &&
+    (!filters.site__display_name || alarm.site__display_name?.toLowerCase().includes(filters.site__display_name.toLowerCase())) &&
+    (!filters.last_updated_at || alarm.last_updated_at?.toLowerCase().includes(filters.last_updated_at.toLowerCase())) &&
+    (!filters.assignee__username || alarm.assignee__username?.toLowerCase().includes(filters.assignee__username.toLowerCase()))
+  );
+
+  // Sorting logic
+  let sortedAlarms = [...filteredAlarms];
+  if (sortBy && sortOrder) {
+    sortedAlarms.sort((a, b) => {
+      const key = sortBy as keyof Alarm;
+      let aVal = a[key];
+      let bVal = b[key];
+      // Special case for date
+      if (key === "last_updated_at") {
+        aVal = new Date(aVal as string).getTime();
+        bVal = new Date(bVal as string).getTime();
+      }
+      if (aVal === undefined || bVal === undefined) return 0;
+      if (typeof aVal === "string" && typeof bVal === "string") {
+        return sortOrder === "asc"
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      }
+      if (aVal < bVal) return sortOrder === "asc" ? -1 : 1;
+      if (aVal > bVal) return sortOrder === "asc" ? 1 : -1;
+      return 0;
+    });
+  }
+
+  // Table columns config
+  const columns = [
+    { key: "ticket_number", label: "Ticket ID" },
+    { key: "name", label: "Name" },
+    { key: "priority", label: "Priority" },
+    { key: "status", label: "Status" },
+    { key: "site__display_name", label: "Site" },
+    { key: "last_updated_at", label: "Last Updated" },
+    { key: "assignee__username", label: "Assignee" },
   ];
+
+  // --- Sorting Button Handler ---
+  function handleSort(colKey: string, order: "asc" | "desc") {
+    setSort(colKey, order);
+  }
 
   return (
     <div>
-      <header className="w-full bg-pink-500 py-1 fixed top-0 left-0 z-10">
+      <header className="w-full bg-green-600 py-1 fixed top-0 left-0 z-10">
         <h1 className="text-xs font-semibold text-white ml-4">Alerts</h1>
         <Button
           className="absolute top-3 right-2"
@@ -263,14 +214,17 @@ function App() {
         </Button>
       </header>
 
-      <Button
-        className="mt-24 mr-4 ml-4 px-3 py-1"
-        variant="outline"
-        size="sm"
-        onClick={() => setShowConfig(true)}
-      >
-        Configure Rules
-      </Button>
+      {/* Controls Row */}
+      <div className="flex items-center justify-between mt-24 mb-4 px-8 w-full max-w-7xl mx-auto">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setShowConfig(true)}
+        >
+          Configure Rules
+        </Button>
+        <InvalidDataButton />
+      </div>
 
       {showConfig && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-30">
@@ -350,7 +304,7 @@ function App() {
           </div>
         </div>
       )}
-    
+
       {BACKEND_MODE === "msw" && (
         <Button
           className="mb-4 px-4 py-2"
@@ -368,16 +322,159 @@ function App() {
           config={config}
         />
       )}
-      <div className="mt-24">
-        <InvalidDataButton />
-        <h2 className="text-lg font-bold ml-8 mb-2">Alarms</h2>
-        
-        {loading ? (
-          <div >Loading...</div>
-        ) : (
-          <DataTable columns={columns} data={alarms} />
-        )}
+
+      <h2 className="text-lg font-bold text-center mb-2">Alarms</h2>
+      {/* Filter Row and Table */}
+      <div className="flex justify-center">
+        <div className="w-full max-w-7xl overflow-x-auto rounded-lg shadow bg-white">
+          {/* Filter Row */}
+          <div className="flex gap-2 px-4 py-2 border-b bg-gray-50">
+            <input
+              className="border px-2 py-1 text-xs w-32"
+              placeholder="Ticket ID"
+              value={filters.ticket_number}
+              onChange={e => setFilter("ticket_number", e.target.value)}
+            />
+            <input
+              className="border px-2 py-1 text-xs w-48"
+              placeholder="Name"
+              value={filters.name}
+              onChange={e => setFilter("name", e.target.value)}
+            />
+            <input
+              className="border px-2 py-1 text-xs w-24"
+              placeholder="Priority"
+              value={filters.priority}
+              onChange={e => setFilter("priority", e.target.value)}
+            />
+            <input
+              className="border px-2 py-1 text-xs w-24"
+              placeholder="Status"
+              value={filters.status}
+              onChange={e => setFilter("status", e.target.value)}
+            />
+            <input
+              className="border px-2 py-1 text-xs w-32"
+              placeholder="Site"
+              value={filters.site__display_name}
+              onChange={e => setFilter("site__display_name", e.target.value)}
+            />
+            <input
+              className="border px-2 py-1 text-xs w-32"
+              placeholder="Last Updated"
+              value={filters.last_updated_at}
+              onChange={e => setFilter("last_updated_at", e.target.value)}
+            />
+            <input
+              className="border px-2 py-1 text-xs w-32"
+              placeholder="Assignee"
+              value={filters.assignee__username}
+              onChange={e => setFilter("assignee__username", e.target.value)}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="ml-2"
+              onClick={resetFilters}
+              type="button"
+            >
+              Reset
+            </Button>
+          </div>
+          {/* Table */}
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead>
+              <tr>
+                {columns.map(col => (
+                  <th
+                    key={col.key}
+                    className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase select-none"
+                  >
+                    <span className="flex items-center gap-1">
+                      {col.label}
+                      <button
+                        type="button"
+                        className={`ml-1 text-xs px-1 rounded ${sortBy === col.key && sortOrder === "asc" ? "bg-gray-200 font-bold" : ""}`}
+                        onClick={() => handleSort(col.key, "asc")}
+                        aria-label={`Sort ${col.label} ascending`}
+                        tabIndex={0}
+                      >
+                        ▲
+                      </button>
+                      <button
+                        type="button"
+                        className={`text-xs px-1 rounded ${sortBy === col.key && sortOrder === "desc" ? "bg-gray-200 font-bold" : ""}`}
+                        onClick={() => handleSort(col.key, "desc")}
+                        aria-label={`Sort ${col.label} descending`}
+                        tabIndex={0}
+                      >
+                        ▼
+                      </button>
+                    </span>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={columns.length} className="p-8 text-center">
+                    Loading...
+                  </td>
+                </tr>
+              ) : sortedAlarms.length === 0 ? (
+                <tr>
+                  <td colSpan={columns.length} className="p-8 text-center text-gray-500">
+                    No data
+                  </td>
+                </tr>
+              ) : (
+                sortedAlarms.map((alarm, idx) => (
+                  <tr key={alarm.ticket_number || idx} className="hover:bg-gray-50">
+                    <td className="px-4 py-2 whitespace-nowrap underline text-blue-700 cursor-pointer"
+                      onMouseEnter={() => {
+                        if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+                        hoverTimeout.current = setTimeout(() => {
+                          setModalAlarm(alarm);
+                          setModalVisible(true);
+                        }, 200);
+                      }}
+                      onMouseLeave={() => {
+                        if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+                        setModalVisible(false);
+                        setTimeout(() => setModalAlarm(null), 200);
+                      }}
+                    >
+                      {alarm.ticket_number}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">{alarm.name}</td>
+                    <td className="px-4 py-2 whitespace-nowrap">{alarm.priority}</td>
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      {alarm.status === "open" ? (
+                        <span className="text-red-600 font-semibold">active</span>
+                      ) : alarm.status === "snoozed" ? (
+                        <span className="text-black-600 font-semibold">snoozed</span>
+                      ) : alarm.status === "un-snoozed" ? (
+                        <span className="text-black-600 font-semibold">unsnoozed</span>
+                      ) : alarm.status === "acknowledged" ? (
+                        <span className="text-black-600 font-semibold">acknowledged</span>
+                      ) : alarm.status === "resolved" ? (
+                        <span className="text-green-600 font-semibold">resolved</span>
+                      ) : (
+                        <span>{alarm.status}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 whitespace-nowrap">{alarm.site__display_name}</td>
+                    <td className="px-4 py-2 whitespace-nowrap">{alarm.last_updated_at}</td>
+                    <td className="px-4 py-2 whitespace-nowrap">{alarm.assignee__username}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
+
       {modalAlarm && (
         <div
           className={`fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-30 transition-opacity duration-200 ${
