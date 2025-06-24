@@ -1,21 +1,21 @@
 import fs from "fs";
 import path from "path";
-import { fileURLToPath } from "url";
 import { parse } from "csv-parse/sync";
-
 const CSV_FILE = path.join(process.cwd(), "messages_log.csv");
 const SUMMARY_FILE = path.join(process.cwd(), "messages_summary.csv");
 
 const content = fs.readFileSync(CSV_FILE, "utf-8");
 const records = parse(content, {
-  columns: ["timestamp", "deviceId", "metric", "value", "ticket_status", "ticket_number", "msg"],
+  columns: false,
   skip_empty_lines: true,
+  trim: true,
+  relax_quotes: true
 });
 
 const statsByDay = {};
 
 for (const rec of records) {
-  const day = rec.timestamp.slice(0, 10); 
+  const day = rec[0].slice(0, 10); // timestamp is at index 0
   if (!statsByDay[day]) {
     statsByDay[day] = {
       date: day,
@@ -26,11 +26,11 @@ for (const rec of records) {
     };
   }
   statsByDay[day].total_messages++;
-  if (rec.ticket_status === "generated" || rec.ticket_status === "updated/open" || rec.ticket_status === "resolved") {
+  if (rec[6] === "generated" || rec[6] === "updated/open" || rec[6] === "resolved") {
     statsByDay[day].total_tickets++;
-  } else if (rec.ticket_status === "no ticket") {
+  } else if (rec[6] === "no ticket") {
     statsByDay[day].total_no_tickets++;
-  } else if (rec.ticket_status === "invalid") {
+  } else if (rec[6] === "invalid") {
     statsByDay[day].total_invalid++;
   }
 }

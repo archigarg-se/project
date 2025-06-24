@@ -12,6 +12,7 @@ import { useConfigStore } from "./stores/config";
 import { useUIStore } from "./stores/ui";
 import { useAuthStore } from "./stores/auth";
 import { getRandomDeviceConfig } from "./lib/utils";
+import InvalidDataButton from "./components/invalid";
 
 const BACKEND_MODE = import.meta.env.VITE_BACKEND_MODE;
 const apiBase = BACKEND_MODE === "server" ? "http://localhost:4000" : "";
@@ -25,6 +26,8 @@ const axiosInstance = axios.create({ baseURL: apiBase });
 //   "Archi", "Aryan", "Abhinav", "Tanvi", "Ridhima",
 //   "Aarav", "Divyam", "Shubham", "Ishaan", "Sara"
 // ];
+
+
 
 function App() {
   // Zustand stores
@@ -261,7 +264,7 @@ function App() {
       </header>
 
       <Button
-        className="mb-2 mr-4 ml-4 px-3 py-1"
+        className="mt-24 mr-4 ml-4 px-3 py-1"
         variant="outline"
         size="sm"
         onClick={() => setShowConfig(true)}
@@ -347,7 +350,7 @@ function App() {
           </div>
         </div>
       )}
-
+    
       {BACKEND_MODE === "msw" && (
         <Button
           className="mb-4 px-4 py-2"
@@ -365,8 +368,10 @@ function App() {
           config={config}
         />
       )}
-      <div className="mt-6">
+      <div className="mt-24">
+        <InvalidDataButton />
         <h2 className="text-lg font-bold ml-8 mb-2">Alarms</h2>
+        
         {loading ? (
           <div >Loading...</div>
         ) : (

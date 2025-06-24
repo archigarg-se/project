@@ -221,16 +221,23 @@ app.post("/api/acknowledge", async (req, res) => {
   }
 });
 
-let telemetryHistory = []; // { deviceId, metric, value, timestamp, site, assignee }
+let telemetryHistory = []; 
 
 app.post("/api/telemetry", async (req, res) => {
   const { deviceId, metric, value, timestamp, site, assignee } = req.body;
   telemetryHistory.push({ deviceId, metric, value, timestamp, site, assignee });
-  // Keep only last 60 minutes
   const cutoff = Date.now() - 60 * 60 * 1000;
   telemetryHistory = telemetryHistory.filter(
     (d) => new Date(d.timestamp).getTime() >= cutoff
   );
+
+  if (isInvalidData(deviceId, metric, value, rules)) {
+    await sendMail(
+      "Invalid Data Detected",
+      `Device: ${deviceId}\nMetric: ${metric}\nValue: ${value}\nTimestamp: ${timestamp}\nSite: ${site}\nAssignee: ${assignee}`
+    );
+  }
+
   res.json({ ok: true });
 });
 

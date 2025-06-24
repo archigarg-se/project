@@ -88,37 +88,40 @@ async function start() {
   await ch.assertQueue(QUEUE);
 
   setInterval(async () => {
-    // Pick a random device and metric
-    const deviceIds = Object.keys(DEVICE_CONFIG);
-    const deviceId = deviceIds[Math.floor(Math.random() * deviceIds.length)];
-    const metrics = DEVICE_CONFIG[deviceId].metrics;
-    const type = metrics[Math.floor(Math.random() * metrics.length)];
-    const value = Math.floor(Math.random() * 120);
-    const timestamp = new Date().toISOString();
-    // Randomize site and assignee ONCE here
-    const site = getRandom(SITES);
-    const assignee = getRandom(ASSIGNEES);
-    const msg = JSON.stringify({
-      type,
-      value,
-      deviceId,
-      timestamp,
-      site,
-      assignee,
-    });
-    ch.sendToQueue(QUEUE, Buffer.from(msg));
-    console.log("Sent:", msg);
+  const deviceIds = Object.keys(DEVICE_CONFIG);
+  const deviceId = getRandom(deviceIds);
+  const metrics = DEVICE_CONFIG[deviceId].metrics;
 
-    // Save telemetry to backend for charting
-    await axios.post("http://localhost:4000/api/telemetry", {
-      deviceId,
-      metric: type,
-      value,
-      timestamp,
-      site,
-      assignee,
-    });
-  }, 10000);
+  let type, value;
+  const isInvalid = Math.random() < 0.2; 
+
+  if (isInvalid) {
+    // INVALID: random wrong metric or alphabet value
+    type = "invalid_metric_" + Math.floor(Math.random() * 100); 
+    value = Math.random() < 0.5 ? "NaN" : "abc"; 
+  } else {
+    // VALID
+    type = getRandom(metrics);
+    value = Math.floor(Math.random() * 120);
+  }
+
+  const timestamp = new Date().toISOString();
+  const site = getRandom(SITES);
+  const assignee = getRandom(ASSIGNEES);
+  const msg = JSON.stringify({ type, value, deviceId, timestamp, site, assignee });
+
+  ch.sendToQueue(QUEUE, Buffer.from(msg));
+  console.log("Sent:", msg);
+
+  await axios.post("http://localhost:4000/api/telemetry", {
+    deviceId,
+    metric: type,
+    value,
+    timestamp,
+    site,
+    assignee,
+  });
+}, 10000);
 
   ch.consume(QUEUE, async (msg) => {
     if (msg !== null) {
