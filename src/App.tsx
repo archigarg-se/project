@@ -20,12 +20,7 @@ const axiosInstance = axios.create({ baseURL: apiBase });
 function App() {
   // Zustand stores
   const { alarms, setAlarms, loading, setLoading } = useAlarmsStore();
-  const {
-    config,
-    showConfig,
-    setConfig,
-    setShowConfig,
-  } = useConfigStore();
+  const { config, showConfig, setConfig, setShowConfig } = useConfigStore();
   const {
     showForm,
     setShowForm,
@@ -36,7 +31,8 @@ function App() {
     selectedDevice,
     setSelectedDevice,
   } = useUIStore();
-  const { token, loginError, setToken, setUser, setLoginError } = useAuthStore();
+  const { token, loginError, setToken, setUser, setLoginError } =
+    useAuthStore();
 
   // Zustand filters store
   const filters = useFiltersStore();
@@ -46,7 +42,10 @@ function App() {
   const sortOrder = useFiltersStore((s) => s.sortOrder);
   const setSort = useFiltersStore((s) => s.setSort);
 
-  const DEVICE_CONFIG = React.useMemo(() => getRandomDeviceConfig(), [showConfig]);
+  const DEVICE_CONFIG = React.useMemo(
+    () => getRandomDeviceConfig(),
+    [showConfig]
+  );
   const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const refreshAlarms = React.useCallback(async () => {
@@ -68,12 +67,14 @@ function App() {
   useEffect(() => {
     if (!token) return;
     setLoading(true);
-    axiosInstance.get("/api/alarms", {
-      headers: { Authorization: `Bearer ${token}` },
-    }).then((res) => {
-      setAlarms(res.data.alarms);
-      setLoading(false);
-    });
+    axiosInstance
+      .get("/api/alarms", {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      .then((res) => {
+        setAlarms(res.data.alarms);
+        setLoading(false);
+      });
   }, [token, setAlarms, setLoading]);
 
   if (!token) {
@@ -148,14 +149,30 @@ function App() {
   const deviceMetrics = DEVICE_CONFIG[selectedDevice]?.metrics || [];
 
   // Filtering logic
-  const filteredAlarms = alarms.filter(alarm =>
-    (!filters.ticket_number || alarm.ticket_number.toString().includes(filters.ticket_number)) &&
-    (!filters.name || alarm.name?.toLowerCase().includes(filters.name.toLowerCase())) &&
-    (!filters.priority || alarm.priority?.toLowerCase().includes(filters.priority.toLowerCase())) &&
-    (!filters.status || alarm.status?.toLowerCase().includes(filters.status.toLowerCase())) &&
-    (!filters.site__display_name || alarm.site__display_name?.toLowerCase().includes(filters.site__display_name.toLowerCase())) &&
-    (!filters.last_updated_at || alarm.last_updated_at?.toLowerCase().includes(filters.last_updated_at.toLowerCase())) &&
-    (!filters.assignee__username || alarm.assignee__username?.toLowerCase().includes(filters.assignee__username.toLowerCase()))
+  const filteredAlarms = alarms.filter(
+    (alarm) =>
+      (!filters.ticket_number ||
+        alarm.ticket_number.toString().includes(filters.ticket_number)) &&
+      (!filters.name ||
+        alarm.name?.toLowerCase().includes(filters.name.toLowerCase())) &&
+      (!filters.priority ||
+        alarm.priority
+          ?.toLowerCase()
+          .includes(filters.priority.toLowerCase())) &&
+      (!filters.status ||
+        alarm.status?.toLowerCase().includes(filters.status.toLowerCase())) &&
+      (!filters.site__display_name ||
+        alarm.site__display_name
+          ?.toLowerCase()
+          .includes(filters.site__display_name.toLowerCase())) &&
+      (!filters.last_updated_at ||
+        alarm.last_updated_at
+          ?.toLowerCase()
+          .includes(filters.last_updated_at.toLowerCase())) &&
+      (!filters.assignee__username ||
+        alarm.assignee__username
+          ?.toLowerCase()
+          .includes(filters.assignee__username.toLowerCase()))
   );
 
   // Sorting logic
@@ -200,30 +217,35 @@ function App() {
 
   return (
     <div>
-      <header className="w-full bg-green-600 py-1 fixed top-0 left-0 z-10">
-        <h1 className="text-xs font-semibold text-white ml-4">Alerts</h1>
-        <Button
-          className="absolute top-3 right-2"
-          variant="outline"
-          onClick={() => {
-            setToken(null);
-            setUser(null);
-          }}
-        >
-          Logout
-        </Button>
+      <header className="w-full py-6 px-8 bg-gradient-to-r from-blue-100 via-purple-100 to-pink-100 rounded-b-xl shadow">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-gray-800">Alerts</h1>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setToken(null);
+              setUser(null);
+            }}
+          >
+            Logout
+          </Button>
+        </div>
       </header>
 
-      {/* Controls Row */}
-      <div className="flex items-center justify-between mt-24 mb-4 px-8 w-full max-w-7xl mx-auto">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setShowConfig(true)}
-        >
-          Configure Rules
-        </Button>
-        <InvalidDataButton />
+      <div className="flex gap-16 justify-start mt-6 px-8 flex-wrap">
+        <div className="bg-white rounded-xl shadow p-4 w-60 text-center">
+          <p className="text-sm font-medium mb-1">Configure Rules</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowConfig(true)}
+          >
+            Open
+          </Button>
+        </div>
+        <div className="bg-white rounded-xl shadow p-4 w-60 text-center">
+          <InvalidDataButton />
+        </div>
       </div>
 
       {showConfig && (
@@ -239,12 +261,18 @@ function App() {
             <h2 className="font-bold mb-4 text-lg text-center">
               Set Alert Rules
             </h2>
-            <form className="flex flex-col gap-4" onSubmit={e => { e.preventDefault(); handleConfigSave(); }}>
+            <form
+              className="flex flex-col gap-4"
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleConfigSave();
+              }}
+            >
               <div>
                 <label className="block text-xs mb-1">Device</label>
                 <select
                   value={selectedDevice}
-                  onChange={e => setSelectedDevice(e.target.value)}
+                  onChange={(e) => setSelectedDevice(e.target.value)}
                   className="border rounded px-2 py-1 text-xs"
                 >
                   {Object.keys(DEVICE_CONFIG).map((deviceId) => (
@@ -256,11 +284,13 @@ function App() {
               </div>
               {deviceMetrics.map((metric: string) => (
                 <div key={metric}>
-                  <label className="block text-xs mb-1 capitalize">{metric}</label>
+                  <label className="block text-xs mb-1 capitalize">
+                    {metric}
+                  </label>
                   <div className="flex gap-2">
                     <select
                       value={config[selectedDevice]?.[metric]?.operator || ">"}
-                      onChange={e =>
+                      onChange={(e) =>
                         setConfig({
                           ...config,
                           [selectedDevice]: {
@@ -282,7 +312,7 @@ function App() {
                     <input
                       type="number"
                       value={config[selectedDevice]?.[metric]?.value || ""}
-                      onChange={e =>
+                      onChange={(e) =>
                         setConfig({
                           ...config,
                           [selectedDevice]: {
@@ -299,7 +329,9 @@ function App() {
                   </div>
                 </div>
               ))}
-              <Button type="submit" variant="outline">Save</Button>
+              <Button type="submit" variant="outline">
+                Save
+              </Button>
             </form>
           </div>
         </div>
@@ -327,151 +359,69 @@ function App() {
       {/* Filter Row and Table */}
       <div className="flex justify-center">
         <div className="w-full max-w-7xl overflow-x-auto rounded-lg shadow bg-white">
-          {/* Filter Row */}
-          <div className="flex gap-2 px-4 py-2 border-b bg-gray-50">
-            <input
-              className="border px-2 py-1 text-xs w-32"
-              placeholder="Ticket ID"
-              value={filters.ticket_number}
-              onChange={e => setFilter("ticket_number", e.target.value)}
-            />
-            <input
-              className="border px-2 py-1 text-xs w-48"
-              placeholder="Name"
+          <div className="flex gap-4 mt-6 mb-4 px-8">
+            <Input
+              className="w-1/3 rounded-full px-4 py-2 text-sm"
+              placeholder="Search Ticket or Name"
               value={filters.name}
-              onChange={e => setFilter("name", e.target.value)}
+              onChange={(e) => {
+                setFilter("ticket_number", e.target.value);
+                setFilter("name", e.target.value);
+              }}
             />
-            <input
-              className="border px-2 py-1 text-xs w-24"
-              placeholder="Priority"
-              value={filters.priority}
-              onChange={e => setFilter("priority", e.target.value)}
-            />
-            <input
-              className="border px-2 py-1 text-xs w-24"
-              placeholder="Status"
-              value={filters.status}
-              onChange={e => setFilter("status", e.target.value)}
-            />
-            <input
-              className="border px-2 py-1 text-xs w-32"
+            <Input
+              className="w-1/4 rounded-full px-4 py-2 text-sm"
               placeholder="Site"
               value={filters.site__display_name}
-              onChange={e => setFilter("site__display_name", e.target.value)}
+              onChange={(e) => setFilter("site__display_name", e.target.value)}
             />
-            <input
-              className="border px-2 py-1 text-xs w-32"
-              placeholder="Last Updated"
-              value={filters.last_updated_at}
-              onChange={e => setFilter("last_updated_at", e.target.value)}
-            />
-            <input
-              className="border px-2 py-1 text-xs w-32"
+            <Input
+              className="w-1/4 rounded-full px-4 py-2 text-sm"
               placeholder="Assignee"
               value={filters.assignee__username}
-              onChange={e => setFilter("assignee__username", e.target.value)}
+              onChange={(e) => setFilter("assignee__username", e.target.value)}
             />
-            <Button
-              variant="ghost"
-              size="sm"
-              className="ml-2"
-              onClick={resetFilters}
-              type="button"
-            >
-              Reset
-            </Button>
           </div>
           {/* Table */}
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead>
-              <tr>
-                {columns.map(col => (
-                  <th
-                    key={col.key}
-                    className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase select-none"
-                  >
-                    <span className="flex items-center gap-1">
+          <div className="overflow-x-auto px-8">
+            <table className="min-w-full bg-white rounded-xl shadow text-sm">
+              <thead className="bg-gray-100 text-gray-600 text-xs uppercase">
+                <tr>
+                  {columns.map((col) => (
+                    <th key={col.key} className="text-left px-4 py-3">
                       {col.label}
-                      <button
-                        type="button"
-                        className={`ml-1 text-xs px-1 rounded ${sortBy === col.key && sortOrder === "asc" ? "bg-gray-200 font-bold" : ""}`}
-                        onClick={() => handleSort(col.key, "asc")}
-                        aria-label={`Sort ${col.label} ascending`}
-                        tabIndex={0}
-                      >
-                        ▲
-                      </button>
-                      <button
-                        type="button"
-                        className={`text-xs px-1 rounded ${sortBy === col.key && sortOrder === "desc" ? "bg-gray-200 font-bold" : ""}`}
-                        onClick={() => handleSort(col.key, "desc")}
-                        aria-label={`Sort ${col.label} descending`}
-                        tabIndex={0}
-                      >
-                        ▼
-                      </button>
-                    </span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={columns.length} className="p-8 text-center">
-                    Loading...
-                  </td>
+                    </th>
+                  ))}
                 </tr>
-              ) : sortedAlarms.length === 0 ? (
-                <tr>
-                  <td colSpan={columns.length} className="p-8 text-center text-gray-500">
-                    No data
-                  </td>
-                </tr>
-              ) : (
-                sortedAlarms.map((alarm, idx) => (
-                  <tr key={alarm.ticket_number || idx} className="hover:bg-gray-50">
-                    <td className="px-4 py-2 whitespace-nowrap underline text-blue-700 cursor-pointer"
-                      onMouseEnter={() => {
-                        if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
-                        hoverTimeout.current = setTimeout(() => {
-                          setModalAlarm(alarm);
-                          setModalVisible(true);
-                        }, 200);
-                      }}
-                      onMouseLeave={() => {
-                        if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
-                        setModalVisible(false);
-                        setTimeout(() => setModalAlarm(null), 200);
-                      }}
-                    >
-                      {alarm.ticket_number}
+              </thead>
+              <tbody>
+                {sortedAlarms.map((alarm) => (
+                  <tr
+                    className="border-t hover:bg-gray-50"
+                    key={alarm.ticket_number}
+                  >
+                    <td className="px-4 py-2">{alarm.ticket_number}</td>
+                    <td className="px-4 py-2">{alarm.name}</td>
+                    <td className="px-4 py-2">{alarm.priority}</td>
+                    <td className="px-4 py-2">
+                      <span
+                        className={`px-2 py-1 rounded-full text-white text-xs ${
+                          alarm.status === "resolved"
+                            ? "bg-green-500"
+                            : "bg-red-500"
+                        }`}
+                      >
+                        {alarm.status}
+                      </span>
                     </td>
-                    <td className="px-4 py-2 whitespace-nowrap">{alarm.name}</td>
-                    <td className="px-4 py-2 whitespace-nowrap">{alarm.priority}</td>
-                    <td className="px-4 py-2 whitespace-nowrap">
-                      {alarm.status === "open" ? (
-                        <span className="text-red-600 font-semibold">active</span>
-                      ) : alarm.status === "snoozed" ? (
-                        <span className="text-black-600 font-semibold">snoozed</span>
-                      ) : alarm.status === "un-snoozed" ? (
-                        <span className="text-black-600 font-semibold">unsnoozed</span>
-                      ) : alarm.status === "acknowledged" ? (
-                        <span className="text-black-600 font-semibold">acknowledged</span>
-                      ) : alarm.status === "resolved" ? (
-                        <span className="text-green-600 font-semibold">resolved</span>
-                      ) : (
-                        <span>{alarm.status}</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-2 whitespace-nowrap">{alarm.site__display_name}</td>
-                    <td className="px-4 py-2 whitespace-nowrap">{alarm.last_updated_at}</td>
-                    <td className="px-4 py-2 whitespace-nowrap">{alarm.assignee__username}</td>
+                    <td className="px-4 py-2">{alarm.site__display_name}</td>
+                    <td className="px-4 py-2">{alarm.last_updated_at}</td>
+                    <td className="px-4 py-2">{alarm.assignee__username}</td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
