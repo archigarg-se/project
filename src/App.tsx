@@ -12,7 +12,10 @@ import InvalidDataButton from "./components/invalid";
 import { useFiltersStore } from "./stores/filters";
 import AlarmForm from "./components/AlarmForm";
 import AlarmHoverCard from "./components/AlarmHoverCard";
+import { IoIosSettings } from "react-icons/io";
 import { IoIosSearch } from "react-icons/io";
+import { MdOutlineAccessTimeFilled } from "react-icons/md";
+
 const BACKEND_MODE = import.meta.env.VITE_BACKEND_MODE;
 const apiBase = BACKEND_MODE === "server" ? "http://localhost:4000" : "";
 const axiosInstance = axios.create({ baseURL: apiBase });
@@ -203,7 +206,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden bg-gray-50">
+    <div className="min-h-screen min-w-screen overflow-x-hidden bg-gray-50">
       <header className="w-full relative py-6 bg-gradient-to-r from-blue-100 via-purple-100 to-pink-100">
         <div className="flex items-center justify-between w-full">
           <h1 className="ml-6 text-2xl font-bold text-gray-800">Alerts</h1>
@@ -221,15 +224,17 @@ function App() {
         </div>
       </header>
 
-      <div className="flex gap-8 justify-center mt-10 mb-4">
-        <Button
-          onClick={() => setShowConfig(true)}
-          className="w-64 h-20 bg-white rounded-xl shadow border-0 text-lg font-semibold text-gray-700 hover:bg-blue-50 transition-all"
-        >
-          Configure Rules
-        </Button>
-        <InvalidDataButton />
-      </div>
+     <div className="flex gap-8 justify-center mt-10 mb-8">
+  <button
+    onClick={() => setShowConfig(true)}
+    className="w-64 h-20 bg-white rounded-xl shadow text-lg font-semibold text-gray-700 flex items-center justify-center gap-4 transition-all"
+    style={{ boxShadow: "0 2px 8px 0 rgba(16,30,54,.08)" }}
+  >
+    <IoIosSettings className="text-2xl text-gray-700" />
+    <span className="text-lg font-semibold text-gray-700">Configure Rules</span>
+  </button>
+  <InvalidDataButton />
+</div>
 
       {showConfig && (
         <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-30">
@@ -343,15 +348,20 @@ function App() {
         <div className="w-full ml-12 mr-12 mt-12">
           {/* Filter Row */}
           <div className="flex flex-wrap gap-2 mb-2">
-            <Input
-              className="border rounded px-2 py-1 flex-1 min-w-[180px]"
-              placeholder="Search Ticket or Name"
-              value={filters.name}
-              onChange={(e) => {
-                setFilter("name", e.target.value);
-                setFilter("ticket_number", e.target.value);
-              }}
-            />
+            <div className="relative flex-1 min-w-[180px]">
+    <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+      <IoIosSearch />
+    </span>
+    <Input
+      className="border rounded pl-8 pr-2 py-1 w-full"
+      placeholder="Search Ticket or Name"
+      value={filters.name}
+      onChange={(e) => {
+        setFilter("name", e.target.value);
+        setFilter("ticket_number", e.target.value);
+      }}
+    />
+  </div>
             <Input
               className="border rounded px-2 py-1 flex-1 min-w-[120px]"
               placeholder="Site"
