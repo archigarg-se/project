@@ -126,7 +126,7 @@ app.post("/api/alarms", async (req, res) => {
     ticket_number: Date.now(),
     name:
       req.body.name ||
-      `${req.body.metric ? req.body.metric.charAt(0).toUpperCase() + req.body.metric.slice(1) : "Metric"} Alert for Device ${req.body.deviceId}`,
+      `${req.body.metric ? req.body.metric.charAt(0).toUpperCase() + req.body.metric.slice(1) : "Metric"} Alert for ${req.body.deviceId}`,
     priority: req.body.priority || "high",
     status: req.body.status || "open",
     site__display_name,

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import axios from "axios";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
@@ -12,14 +12,14 @@ import InvalidDataButton from "./components/invalid";
 import { useFiltersStore } from "./stores/filters";
 import AlarmForm from "./components/AlarmForm";
 import AlarmHoverCard from "./components/AlarmHoverCard";
-
+import { IoIosSearch } from "react-icons/io";
 const BACKEND_MODE = import.meta.env.VITE_BACKEND_MODE;
 const apiBase = BACKEND_MODE === "server" ? "http://localhost:4000" : "";
 const axiosInstance = axios.create({ baseURL: apiBase });
 
 function App() {
   // Zustand stores
-  const { alarms, setAlarms, loading, setLoading } = useAlarmsStore();
+  const { alarms, setAlarms, setLoading } = useAlarmsStore();
   const { config, showConfig, setConfig, setShowConfig } = useConfigStore();
   const {
     showForm,
@@ -37,7 +37,6 @@ function App() {
   // Zustand filters store
   const filters = useFiltersStore();
   const setFilter = useFiltersStore((s) => s.setFilter);
-  const resetFilters = useFiltersStore((s) => s.resetFilters);
   const sortBy = useFiltersStore((s) => s.sortBy);
   const sortOrder = useFiltersStore((s) => s.sortOrder);
   const setSort = useFiltersStore((s) => s.setSort);
@@ -46,7 +45,6 @@ function App() {
     () => getRandomDeviceConfig(),
     [showConfig]
   );
-  const hoverTimeout = useRef<NodeJS.Timeout | null>(null);
 
   const refreshAlarms = React.useCallback(async () => {
     setLoading(true);
@@ -149,31 +147,20 @@ function App() {
   const deviceMetrics = DEVICE_CONFIG[selectedDevice]?.metrics || [];
 
   // Filtering logic
-  const filteredAlarms = alarms.filter(
-    (alarm) =>
-      (!filters.ticket_number ||
-        alarm.ticket_number.toString().includes(filters.ticket_number)) &&
-      (!filters.name ||
-        alarm.name?.toLowerCase().includes(filters.name.toLowerCase())) &&
-      (!filters.priority ||
-        alarm.priority
-          ?.toLowerCase()
-          .includes(filters.priority.toLowerCase())) &&
-      (!filters.status ||
-        alarm.status?.toLowerCase().includes(filters.status.toLowerCase())) &&
-      (!filters.site__display_name ||
-        alarm.site__display_name
-          ?.toLowerCase()
-          .includes(filters.site__display_name.toLowerCase())) &&
-      (!filters.last_updated_at ||
-        alarm.last_updated_at
-          ?.toLowerCase()
-          .includes(filters.last_updated_at.toLowerCase())) &&
-      (!filters.assignee__username ||
-        alarm.assignee__username
-          ?.toLowerCase()
-          .includes(filters.assignee__username.toLowerCase()))
-  );
+  const filteredAlarms = alarms.filter((alarm) => {
+    const search = filters.name?.toLowerCase() || "";
+    const ticketMatch = alarm.ticket_number.toString().toLowerCase().includes(search);
+    const nameMatch = alarm.name?.toLowerCase().includes(search);
+    const matchesSearch = !search || ticketMatch || nameMatch;
+    return (
+      matchesSearch &&
+      (!filters.priority || alarm.priority?.toLowerCase().includes(filters.priority.toLowerCase())) &&
+      (!filters.status || alarm.status?.toLowerCase().includes(filters.status.toLowerCase())) &&
+      (!filters.site__display_name || alarm.site__display_name?.toLowerCase().includes(filters.site__display_name.toLowerCase())) &&
+      (!filters.last_updated_at || alarm.last_updated_at?.toLowerCase().includes(filters.last_updated_at.toLowerCase())) &&
+      (!filters.assignee__username || alarm.assignee__username?.toLowerCase().includes(filters.assignee__username.toLowerCase()))
+    );
+  });
 
   // Sorting logic
   let sortedAlarms = [...filteredAlarms];
@@ -216,10 +203,11 @@ function App() {
   }
 
   return (
-    <div>
-      <header className="w-full py-6 px-8 bg-gradient-to-r from-blue-100 via-purple-100 to-pink-100 rounded-b-xl shadow">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-gray-800">Alerts</h1>
+    <div className="min-h-screen w-full overflow-x-hidden bg-gray-50">
+      <header className="w-full relative py-6 bg-gradient-to-r from-blue-100 via-purple-100 to-pink-100">
+        <div className="flex items-center justify-between w-full">
+          <h1 className="ml-6 text-2xl font-bold text-gray-800">Alerts</h1>
+          <div className="mr-6">
           <Button
             variant="outline"
             onClick={() => {
@@ -229,23 +217,18 @@ function App() {
           >
             Logout
           </Button>
+          </div>
         </div>
       </header>
 
-      <div className="flex gap-16 justify-start mt-6 px-8 flex-wrap">
-        <div className="bg-white rounded-xl shadow p-4 w-60 text-center">
-          <p className="text-sm font-medium mb-1">Configure Rules</p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowConfig(true)}
-          >
-            Open
-          </Button>
-        </div>
-        <div className="bg-white rounded-xl shadow p-4 w-60 text-center">
-          <InvalidDataButton />
-        </div>
+      <div className="flex gap-8 justify-center mt-10 mb-4">
+        <Button
+          onClick={() => setShowConfig(true)}
+          className="w-64 h-20 bg-white rounded-xl shadow border-0 text-lg font-semibold text-gray-700 hover:bg-blue-50 transition-all"
+        >
+          Configure Rules
+        </Button>
+        <InvalidDataButton />
       </div>
 
       {showConfig && (
@@ -355,41 +338,75 @@ function App() {
         />
       )}
 
-      <h2 className="text-lg font-bold text-center mb-2">Alarms</h2>
       {/* Filter Row and Table */}
-      <div className="flex justify-center">
-        <div className="w-full max-w-7xl overflow-x-auto rounded-lg shadow bg-white">
-          <div className="flex gap-4 mt-6 mb-4 px-8">
+      <div className="w-full flex justify-center">
+        <div className="w-full ml-12 mr-12 mt-12">
+          {/* Filter Row */}
+          <div className="flex flex-wrap gap-2 mb-2">
             <Input
-              className="w-1/3 rounded-full px-4 py-2 text-sm"
+              className="border rounded px-2 py-1 flex-1 min-w-[180px]"
               placeholder="Search Ticket or Name"
               value={filters.name}
               onChange={(e) => {
-                setFilter("ticket_number", e.target.value);
                 setFilter("name", e.target.value);
+                setFilter("ticket_number", e.target.value);
               }}
             />
             <Input
-              className="w-1/4 rounded-full px-4 py-2 text-sm"
+              className="border rounded px-2 py-1 flex-1 min-w-[120px]"
               placeholder="Site"
               value={filters.site__display_name}
               onChange={(e) => setFilter("site__display_name", e.target.value)}
             />
             <Input
-              className="w-1/4 rounded-full px-4 py-2 text-sm"
+              className="border rounded px-2 py-1 flex-1 min-w-[120px]"
               placeholder="Assignee"
               value={filters.assignee__username}
               onChange={(e) => setFilter("assignee__username", e.target.value)}
             />
           </div>
-          {/* Table */}
-          <div className="overflow-x-auto px-8">
-            <table className="min-w-full bg-white rounded-xl shadow text-sm">
-              <thead className="bg-gray-100 text-gray-600 text-xs uppercase">
+          <div className="overflow-x-auto bg-white w-full">
+            <table className="min-w-full w-full text-sm text-left">
+              <thead className="bg-gray-100">
                 <tr>
                   {columns.map((col) => (
-                    <th key={col.key} className="text-left px-4 py-3">
-                      {col.label}
+                    <th
+                      key={col.key}
+                      className="px-4 py-2 font-semibold select-none"
+                    >
+                      <span className="flex items-center gap-1">
+                        {col.label}
+                        <button
+                          className="text-xs bg-gray-100 px-1 outline-none"
+                          onClick={() =>
+                            handleSort(
+                              col.key,
+                              sortOrder === "asc" && sortBy === col.key
+                                ? "desc"
+                                : "asc"
+                            )
+                          }
+                        >
+                          <span
+                            className={
+                              sortBy === col.key && sortOrder === "asc"
+                                ? "text-blue-600"
+                                : "text-gray-400"
+                            }
+                          >
+                            ▲
+                          </span>
+                          <span
+                            className={
+                              sortBy === col.key && sortOrder === "desc"
+                                ? "text-blue-600"
+                                : "text-gray-400"
+                            }
+                          >
+                            ▼
+                          </span>
+                        </button>
+                      </span>
                     </th>
                   ))}
                 </tr>
@@ -397,13 +414,17 @@ function App() {
               <tbody>
                 {sortedAlarms.map((alarm) => (
                   <tr
-                    className="border-t hover:bg-gray-50"
                     key={alarm.ticket_number}
+                    className="hover:bg-blue-50 cursor-pointer transition"
+                    onClick={() => {
+                      setModalAlarm(alarm);
+                      setModalVisible(true);
+                    }}
                   >
-                    <td className="px-4 py-2">{alarm.ticket_number}</td>
-                    <td className="px-4 py-2">{alarm.name}</td>
-                    <td className="px-4 py-2">{alarm.priority}</td>
-                    <td className="px-4 py-2">
+                    <td className="px-4 py-2 border-b">{alarm.ticket_number}</td>
+                    <td className="px-4 py-2 border-b">{alarm.name}</td>
+                    <td className="px-4 py-2 border-b">{alarm.priority}</td>
+                    <td className="px-4 py-2 border-b">
                       <span
                         className={`px-2 py-1 rounded-full text-white text-xs ${
                           alarm.status === "resolved"
@@ -414,11 +435,18 @@ function App() {
                         {alarm.status}
                       </span>
                     </td>
-                    <td className="px-4 py-2">{alarm.site__display_name}</td>
-                    <td className="px-4 py-2">{alarm.last_updated_at}</td>
-                    <td className="px-4 py-2">{alarm.assignee__username}</td>
+                    <td className="px-4 py-2 border-b">{alarm.site__display_name}</td>
+                    <td className="px-4 py-2 border-b">{alarm.last_updated_at}</td>
+                    <td className="px-4 py-2 border-b">{alarm.assignee__username}</td>
                   </tr>
                 ))}
+                {sortedAlarms.length === 0 && (
+                  <tr>
+                    <td colSpan={columns.length} className="text-center py-4 text-gray-400">
+                      No alarms found.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
